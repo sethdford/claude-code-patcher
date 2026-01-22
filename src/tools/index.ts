@@ -6,14 +6,17 @@
  */
 
 export * from './task-tools.js';
+export * from './gastown-tools.js';
 
 // Re-export all built-in tools as a single array
 import { taskTools } from './task-tools.js';
+import { gastownTools } from './gastown-tools.js';
 import type { CustomToolDefinition } from '../types.js';
 
 /**
  * All built-in tools
  */
 export const builtInTools: CustomToolDefinition[] = [
-  ...taskTools
+  ...taskTools,
+  ...gastownTools
 ];

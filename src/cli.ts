@@ -14,7 +14,7 @@
 
 import { patch, unpatch, getPatchStatus } from './patcher.js';
 import { findCli, findAllClis } from './cli-finder.js';
-import { taskTools } from './tools/index.js';
+import { taskTools, gastownTools, builtInTools } from './tools/index.js';
 import type { CustomToolDefinition } from './types.js';
 
 const VERSION = '1.0.0';
@@ -39,6 +39,9 @@ function printHelp() {
   console.log('  find               Find all Claude Code installations');
   console.log('');
   console.log('Options:');
+  console.log('  --tasks            Use task management tools (default)');
+  console.log('  --gastown          Use Gastown multi-agent tools');
+  console.log('  --all              Use all built-in tools');
   console.log('  --config <file>    Path to custom tools config file');
   console.log('  --cli <path>       Path to Claude Code CLI');
   console.log('  --no-backup        Skip creating backup');
@@ -46,7 +49,9 @@ function printHelp() {
   console.log('  --version, -v      Show version');
   console.log('');
   console.log('Examples:');
-  console.log('  claude-patcher patch                    # Use built-in task tools');
+  console.log('  claude-patcher patch                    # Use task tools (default)');
+  console.log('  claude-patcher patch --gastown          # Use Gastown tools');
+  console.log('  claude-patcher patch --all              # Use all tools');
   console.log('  claude-patcher patch --config tools.js  # Use custom tools');
   console.log('  claude-patcher status                   # Check if patched');
   console.log('  claude-patcher unpatch                  # Remove patch');
@@ -83,17 +88,65 @@ function printStatus() {
 }
 
 function printList() {
-  console.log('Built-in Tools:');
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('  TASK TOOLS (--tasks, default)');
+  console.log('═══════════════════════════════════════════════════════════════');
   console.log('');
   
   for (const tool of taskTools) {
     console.log(`  ${tool.icon || '🔧'} ${tool.name}`);
-    console.log(`     ${tool.description}`);
+    console.log(`     ${tool.description.slice(0, 70)}...`);
     console.log('');
   }
   
-  console.log('To use these tools, run:');
-  console.log('  claude-patcher patch');
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('  GASTOWN TOOLS (--gastown)');
+  console.log('  Multi-agent orchestration for Claude Code');
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('');
+  
+  console.log('  Beads (Issue Tracking):');
+  for (const tool of gastownTools.filter(t => t.name.startsWith('Bead'))) {
+    console.log(`    ${tool.icon || '🔧'} ${tool.name} - ${tool.description.slice(0, 50)}...`);
+  }
+  console.log('');
+  
+  console.log('  Convoys (Work Bundles):');
+  for (const tool of gastownTools.filter(t => t.name.startsWith('Convoy'))) {
+    console.log(`    ${tool.icon || '🔧'} ${tool.name} - ${tool.description.slice(0, 50)}...`);
+  }
+  console.log('');
+  
+  console.log('  Agent Coordination:');
+  for (const tool of gastownTools.filter(t => t.name.startsWith('Agent'))) {
+    console.log(`    ${tool.icon || '🔧'} ${tool.name} - ${tool.description.slice(0, 50)}...`);
+  }
+  console.log('');
+  
+  console.log('  Hooks (Persistent State):');
+  for (const tool of gastownTools.filter(t => t.name.startsWith('Hook'))) {
+    console.log(`    ${tool.icon || '🔧'} ${tool.name} - ${tool.description.slice(0, 50)}...`);
+  }
+  console.log('');
+  
+  console.log('  Mail (Inter-Agent Messaging):');
+  for (const tool of gastownTools.filter(t => t.name.startsWith('Mail'))) {
+    console.log(`    ${tool.icon || '🔧'} ${tool.name} - ${tool.description.slice(0, 50)}...`);
+  }
+  console.log('');
+  
+  console.log('  Identity:');
+  for (const tool of gastownTools.filter(t => t.name === 'WhoAmI')) {
+    console.log(`    ${tool.icon || '🔧'} ${tool.name} - ${tool.description.slice(0, 50)}...`);
+  }
+  console.log('');
+  
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('');
+  console.log('Usage:');
+  console.log('  claude-patcher patch           # Task tools only');
+  console.log('  claude-patcher patch --gastown # Gastown tools only');
+  console.log('  claude-patcher patch --all     # All tools');
 }
 
 function printFind() {
@@ -140,7 +193,8 @@ async function loadCustomTools(configPath: string): Promise<CustomToolDefinition
 }
 
 async function runPatch(args: string[]) {
-  let tools = taskTools;
+  let tools: CustomToolDefinition[] = taskTools;
+  let toolSetName = 'Task Tools';
   let cliPath: string | undefined;
   let backup = true;
   
@@ -150,6 +204,16 @@ async function runPatch(args: string[]) {
       const configPath = args[++i];
       const fullPath = configPath.startsWith('/') ? configPath : `${process.cwd()}/${configPath}`;
       tools = await loadCustomTools(fullPath);
+      toolSetName = 'Custom Tools';
+    } else if (args[i] === '--gastown') {
+      tools = gastownTools;
+      toolSetName = 'Gastown Tools';
+    } else if (args[i] === '--tasks') {
+      tools = taskTools;
+      toolSetName = 'Task Tools';
+    } else if (args[i] === '--all') {
+      tools = builtInTools;
+      toolSetName = 'All Built-in Tools';
     } else if (args[i] === '--cli' && args[i + 1]) {
       cliPath = args[++i];
     } else if (args[i] === '--no-backup') {
@@ -157,7 +221,8 @@ async function runPatch(args: string[]) {
     }
   }
   
-  console.log('Patching Claude Code...');
+  console.log(`Patching Claude Code with ${toolSetName}...`);
+  console.log(`Tools: ${tools.map(t => t.name).join(', ')}`);
   console.log('');
   
   const result = patch({
@@ -195,10 +260,23 @@ async function runPatch(args: string[]) {
   console.log('');
   console.log('╔════════════════════════════════════════════════════════════╗');
   console.log('║  Custom tools are now available in Claude Code!            ║');
-  console.log('║                                                            ║');
-  console.log('║  Try it:                                                   ║');
-  console.log('║    claude                                                  ║');
-  console.log('║    > Create a task to review the code                      ║');
+  console.log('╠════════════════════════════════════════════════════════════╣');
+  
+  if (toolSetName === 'Gastown Tools' || toolSetName === 'All Built-in Tools') {
+    console.log('║  Gastown multi-agent coordination enabled!                 ║');
+    console.log('║                                                            ║');
+    console.log('║  Try it:                                                   ║');
+    console.log('║    claude                                                  ║');
+    console.log('║    > Who am I?                                             ║');
+    console.log('║    > Create a bead to implement user authentication        ║');
+    console.log('║    > List all beads                                        ║');
+    console.log('║    > Check my mail                                         ║');
+  } else {
+    console.log('║  Try it:                                                   ║');
+    console.log('║    claude                                                  ║');
+    console.log('║    > Create a task to review the code                      ║');
+  }
+  
   console.log('╚════════════════════════════════════════════════════════════╝');
 }
 

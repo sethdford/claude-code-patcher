@@ -20,19 +20,47 @@ This project allows you to inject custom tools directly into the Claude Code CLI
 # Install
 npm install -g claude-code-patcher
 
-# Patch Claude Code with built-in task tools
+# Patch Claude Code with task tools (default)
 claude-patcher patch
+
+# Or patch with Gastown multi-agent tools
+claude-patcher patch --gastown
+
+# Or use all tools
+claude-patcher patch --all
 
 # Try it!
 claude
-> Create a task to review the authentication code
-> List my tasks
-> Mark task-1 as resolved
+> Who am I?
+> Create a bead to implement user authentication
+> List all beads
+> Check my mail
+```
+
+### Multi-Agent Workflow
+
+With Gastown tools, multiple Claude Code instances can coordinate:
+
+```bash
+# Terminal 1 (Agent A)
+claude
+> Create a bead to implement the API endpoints
+> Create a convoy called "API Sprint" with that bead
+> Sling the bead to agent-b
+
+# Terminal 2 (Agent B) 
+claude
+> Who am I?
+> Check my mail
+> Update bead gt-00001 status to in_progress
+> Send mail to agent-a: "Starting work on API endpoints"
 ```
 
 ## Built-in Tools
 
-The patcher comes with a set of task management tools:
+### Task Tools (Default)
+
+Simple task management, similar to TodoWrite:
 
 | Tool | Description |
 |------|-------------|
@@ -42,6 +70,52 @@ The patcher comes with a set of task management tools:
 | **TaskList** | List all tasks with optional status filter |
 
 Tasks are stored in `~/.claude/tasks.json`.
+
+### Gastown Tools (Multi-Agent)
+
+Full [Gastown](https://github.com/steveyegge/gastown) integration for multi-agent orchestration:
+
+**Beads (Issue Tracking):**
+| Tool | Description |
+|------|-------------|
+| **BeadCreate** | Create work items with title, description, tags, blockers |
+| **BeadGet** | Retrieve bead details including comments and history |
+| **BeadUpdate** | Update status, add comments, change assignee |
+| **BeadList** | Filter beads by status, assignee, rig, or convoy |
+
+**Convoys (Work Bundles):**
+| Tool | Description |
+|------|-------------|
+| **ConvoyCreate** | Bundle beads into coordinated work units |
+| **ConvoyAdd** | Add beads to existing convoys |
+| **ConvoyShow** | View convoy progress and bead statuses |
+| **ConvoyList** | List all convoys with status |
+
+**Agent Coordination:**
+| Tool | Description |
+|------|-------------|
+| **AgentSling** | Assign beads to agents (like `gt sling`) |
+| **AgentList** | See all agents and their assignments |
+
+**Hooks (Persistent State):**
+| Tool | Description |
+|------|-------------|
+| **HookWrite** | Save state that survives restarts |
+| **HookRead** | Recover saved state |
+
+**Mail (Inter-Agent Messaging):**
+| Tool | Description |
+|------|-------------|
+| **MailSend** | Send messages to other agents |
+| **MailCheck** | Check mailbox for messages |
+| **MailReply** | Reply to received messages |
+
+**Identity:**
+| Tool | Description |
+|------|-------------|
+| **WhoAmI** | Get your agent ID, assignments, and context |
+
+Gastown state is stored in `~/.gastown/store.json` (shared across all Claude instances).
 
 ## CLI Commands
 
@@ -189,6 +263,48 @@ interface JsonSchema {
   }>;
   required?: string[];       // Required property names
 }
+```
+
+## Cross-Instance Collaboration
+
+The Gastown tools enable multiple Claude Code instances to work together:
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Claude Code 1  │     │  Claude Code 2  │     │  Claude Code 3  │
+│    (Mayor)      │     │   (Worker A)    │     │   (Worker B)    │
+└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
+         │                       │                       │
+         │    ┌──────────────────┴───────────────────────┤
+         │    │                                          │
+         ▼    ▼                                          ▼
+    ┌─────────────────────────────────────────────────────────┐
+    │              ~/.gastown/store.json                       │
+    │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐    │
+    │  │  Beads  │  │ Convoys │  │  Hooks  │  │  Mail   │    │
+    │  └─────────┘  └─────────┘  └─────────┘  └─────────┘    │
+    └─────────────────────────────────────────────────────────┘
+```
+
+**Key Features:**
+
+1. **Shared State**: All Claude instances read/write to the same store
+2. **Mailbox System**: Agents can send messages to each other
+3. **Work Assignment**: Sling beads to specific agents
+4. **Persistent Hooks**: State survives agent restarts
+5. **Identity Awareness**: Each agent knows who they are (`WhoAmI`)
+
+**Environment Variables:**
+
+```bash
+# Set custom agent ID (otherwise auto-generated)
+export GT_AGENT_ID=mayor
+
+# Set custom Gastown home (otherwise ~/.gastown)
+export GT_HOME=/path/to/gastown
+
+# Set custom tasks file for task tools
+export CLAUDE_TASKS_FILE=/path/to/tasks.json
 ```
 
 ## How It Works

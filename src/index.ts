@@ -43,11 +43,33 @@ export { generateToolCode, generateInjectionCode } from './tool-builder.js';
 
 // Built-in tools
 export { 
+  // Task tools
   taskTools,
   TaskCreate,
   TaskGet,
   TaskUpdate,
   TaskList,
+  
+  // Gastown tools
+  gastownTools,
+  BeadCreate,
+  BeadGet,
+  BeadUpdate,
+  BeadList,
+  ConvoyCreate,
+  ConvoyAdd,
+  ConvoyShow,
+  ConvoyList,
+  AgentSling,
+  AgentList,
+  HookWrite,
+  HookRead,
+  MailSend,
+  MailCheck,
+  MailReply,
+  WhoAmI,
+  
+  // All tools
   builtInTools
 } from './tools/index.js';
 
