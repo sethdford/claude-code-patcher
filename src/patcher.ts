@@ -87,14 +87,34 @@ export function patch(config: PatcherConfig): PatchResult {
   // Generate injection code
   const injectionCode = generateInjectionCode(config.tools);
   
-  // Find injection point (after 'var ')
-  const injectionPoint = content.indexOf('var ');
-  if (injectionPoint === -1) {
+  // Find injection point AFTER Zod (v) is defined
+  // Zod is defined as: var v={...};
+  // We need to inject after this so our schemas can use v.string(), v.object(), etc.
+  const zodDefStart = content.indexOf('var v={');
+  if (zodDefStart === -1) {
     return {
       success: false,
-      error: 'Could not find injection point in CLI'
+      error: 'Could not find Zod (v) definition. This version of Claude Code may not be compatible.'
     };
   }
+  
+  // Find the end of the Zod definition block
+  // It ends with: });var  (next variable definition)
+  // We'll look for the closing of the Zod IIFE
+  let zodDefEnd = content.indexOf('});var ', zodDefStart);
+  if (zodDefEnd === -1) {
+    // Try alternative pattern
+    zodDefEnd = content.indexOf('});', zodDefStart);
+  }
+  if (zodDefEnd === -1) {
+    return {
+      success: false,
+      error: 'Could not find end of Zod definition'
+    };
+  }
+  
+  // Inject after the Zod definition closes
+  const injectionPoint = zodDefEnd + 3; // After '});'
   
   // Verify the injection target exists
   if (!content.includes(INJECTION_TARGET)) {
