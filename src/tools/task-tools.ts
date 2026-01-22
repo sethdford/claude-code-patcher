@@ -11,7 +11,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import type { CustomToolDefinition } from '../types.js';
+import type { CustomToolDefinition, ToolContext } from '../types.js';
 
 /**
  * Task data structure
@@ -110,7 +110,7 @@ export const TaskCreate: CustomToolDefinition = {
   readOnly: false,
   concurrencySafe: false,
   
-  async execute(input: { subject: string; description?: string; blocked_by?: string[] }) {
+  async execute(input: { subject: string; description?: string; blocked_by?: string[] }, _context?: ToolContext) {
     const data = loadTasks();
     
     const task: Task = {
@@ -168,7 +168,7 @@ export const TaskGet: CustomToolDefinition = {
   readOnly: true,
   concurrencySafe: true,
   
-  async execute(input: { task_id: string }) {
+  async execute(input: { task_id: string }, _context?: ToolContext) {
     const data = loadTasks();
     const task = data.tasks.find(t => t.id === input.task_id);
     
@@ -232,7 +232,7 @@ export const TaskUpdate: CustomToolDefinition = {
     status?: 'open' | 'in_progress' | 'blocked' | 'resolved';
     comment?: string;
     blocked_by?: string[];
-  }) {
+  }, _context?: ToolContext) {
     const data = loadTasks();
     const task = data.tasks.find(t => t.id === input.task_id);
     
@@ -307,7 +307,7 @@ export const TaskList: CustomToolDefinition = {
   readOnly: true,
   concurrencySafe: true,
   
-  async execute(input: { status?: string }) {
+  async execute(input: { status?: string }, _context?: ToolContext) {
     const data = loadTasks();
     let tasks = data.tasks;
     

@@ -131,7 +131,8 @@ export interface ClaudeTool<TInput = unknown, TOutput = unknown> {
  * Simplified tool definition for users creating custom tools
  * The patcher will fill in defaults for optional fields
  */
-export interface CustomToolDefinition<TInput = unknown, TOutput = unknown> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface CustomToolDefinition<TInput = any, TOutput = any> {
   /** Unique tool name */
   name: string;
   
@@ -160,7 +161,7 @@ export interface CustomToolDefinition<TInput = unknown, TOutput = unknown> {
   icon?: string;
   
   /** The main execution function */
-  execute: (input: TInput, context: ToolContext) => Promise<TOutput>;
+  execute: (input: TInput, context?: ToolContext) => Promise<TOutput>;
 }
 
 /**
