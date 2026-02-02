@@ -13,9 +13,21 @@
  */
 
 import { patch, unpatch, getPatchStatus } from './patcher.js';
-import { findCli, findAllClis } from './cli-finder.js';
+import { findAllClis } from './cli-finder.js';
 import { taskTools, gastownTools, builtInTools } from './tools/index.js';
 import type { CustomToolDefinition } from './types.js';
+import { execSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
+import {
+  detectAllGates,
+  detectPatchableGates,
+  scanAllFlags,
+  enableGate,
+  disableGate,
+  enableAllGates,
+  resetGates,
+  getAllGates,
+} from './gates/index.js';
 
 const VERSION = '1.0.0';
 
@@ -31,20 +43,40 @@ function printBanner() {
 function printHelp() {
   console.log('Usage: claude-patcher <command> [options]');
   console.log('');
-  console.log('Commands:');
+  console.log('PATCHING COMMANDS:');
   console.log('  patch              Patch Claude Code with custom tools');
   console.log('  unpatch            Remove patch from Claude Code');
   console.log('  status             Check current patch status');
   console.log('  list               List available built-in tools');
   console.log('  find               Find all Claude Code installations');
   console.log('');
-  console.log('Options:');
+  console.log('FEATURE GATE COMMANDS:');
+  console.log('  gates              List all detected feature gates');
+  console.log('  gates enable <n>   Enable a feature gate (e.g., swarm, team)');
+  console.log('  gates enable --all Enable all patchable feature gates');
+  console.log('  gates disable <n>  Disable a feature gate');
+  console.log('  gates reset        Restore all gates to defaults from backup');
+  console.log('  gates scan         Scan binary for all tengu_* flags');
+  console.log('');
+  console.log('EXECUTION COMMANDS:');
+  console.log('  exec <prompt>      Execute a prompt via Claude Code headless mode');
+  console.log('');
+  console.log('Patch Options:');
   console.log('  --tasks            Use task management tools (default)');
   console.log('  --gastown          Use Gastown multi-agent tools');
   console.log('  --all              Use all built-in tools');
   console.log('  --config <file>    Path to custom tools config file');
   console.log('  --cli <path>       Path to Claude Code CLI');
   console.log('  --no-backup        Skip creating backup');
+  console.log('');
+  console.log('Exec Options:');
+  console.log('  --json             Output as JSON');
+  console.log('  --model <model>    Model to use (e.g., sonnet, opus)');
+  console.log('  --working-dir <d>  Working directory for Claude');
+  console.log('  --timeout <ms>     Timeout in milliseconds (default: 300000)');
+  console.log('  --output <file>    Write output to file');
+  console.log('');
+  console.log('General Options:');
   console.log('  --help, -h         Show this help');
   console.log('  --version, -v      Show version');
   console.log('');
@@ -55,6 +87,12 @@ function printHelp() {
   console.log('  claude-patcher patch --config tools.js  # Use custom tools');
   console.log('  claude-patcher status                   # Check if patched');
   console.log('  claude-patcher unpatch                  # Remove patch');
+  console.log('  claude-patcher gates                    # List detected gates');
+  console.log('  claude-patcher gates enable swarm       # Enable swarm mode');
+  console.log('  claude-patcher gates enable --all       # Enable all gates');
+  console.log('  claude-patcher gates scan               # Scan for tengu flags');
+  console.log('  claude-patcher exec "Explain this project"');
+  console.log('  claude-patcher exec --json --model opus "Review src/cli.ts"');
   console.log('');
 }
 
@@ -306,6 +344,276 @@ function runUnpatch(args: string[]) {
   }
 }
 
+interface ExecOptions {
+  json: boolean;
+  model: string | null;
+  workingDir: string | null;
+  timeout: number;
+  output: string | null;
+}
+
+function cmdExec(args: string[]) {
+  const options: ExecOptions = {
+    json: false,
+    model: null,
+    workingDir: null,
+    timeout: 300000,
+    output: null,
+  };
+
+  // Separate flags from the prompt
+  const promptParts: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--json') {
+      options.json = true;
+    } else if (args[i] === '--model' && args[i + 1]) {
+      options.model = args[++i];
+    } else if (args[i] === '--working-dir' && args[i + 1]) {
+      options.workingDir = args[++i];
+    } else if (args[i] === '--timeout' && args[i + 1]) {
+      options.timeout = parseInt(args[++i], 10) || 300000;
+    } else if (args[i] === '--output' && args[i + 1]) {
+      options.output = args[++i];
+    } else if (!args[i].startsWith('--')) {
+      promptParts.push(args[i]);
+    }
+  }
+
+  const prompt = promptParts.join(' ');
+  if (!prompt) {
+    console.error('Error: exec requires a prompt argument');
+    console.error('Usage: claude-patcher exec "your prompt here"');
+    process.exit(1);
+  }
+
+  // Build claude CLI command
+  const claudeArgs: string[] = ['--print'];
+
+  if (options.json) {
+    claudeArgs.push('--output-format', 'stream-json');
+  }
+  if (options.model) {
+    claudeArgs.push('--model', options.model);
+  }
+
+  claudeArgs.push(prompt);
+
+  // Find claude binary
+  let claudeBin = 'claude';
+  try {
+    execSync('which claude', { encoding: 'utf8', stdio: 'pipe' });
+  } catch {
+    console.error('Error: Claude Code CLI not found. Install with:');
+    console.error('  npm install -g @anthropic-ai/claude-code');
+    process.exit(1);
+  }
+
+  const spawnOptions: { cwd?: string; timeout: number; stdio: [string, string, string] } = {
+    timeout: options.timeout,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  };
+
+  if (options.workingDir) {
+    spawnOptions.cwd = options.workingDir;
+  }
+
+  console.log(`Executing: claude ${claudeArgs.join(' ')}`);
+  console.log('');
+
+  try {
+    const result = execSync(
+      `${claudeBin} ${claudeArgs.map(a => `"${a.replace(/"/g, '\\"')}"`).join(' ')}`,
+      {
+        encoding: 'utf8',
+        timeout: options.timeout,
+        cwd: options.workingDir || undefined,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }
+    );
+
+    if (options.output) {
+      writeFileSync(options.output, result);
+      console.log(`Output written to: ${options.output}`);
+    } else {
+      console.log(result);
+    }
+  } catch (err: unknown) {
+    const execErr = err as { status?: number; stdout?: string; stderr?: string; signal?: string };
+    if (execErr.signal === 'SIGTERM') {
+      console.error('Error: Execution timed out');
+      process.exit(124);
+    }
+    if (execErr.stderr) {
+      console.error(execErr.stderr);
+    }
+    if (execErr.stdout && options.output) {
+      writeFileSync(options.output, execErr.stdout);
+      console.log(`Partial output written to: ${options.output}`);
+    } else if (execErr.stdout) {
+      console.log(execErr.stdout);
+    }
+    process.exit(execErr.status || 1);
+  }
+}
+
+function printGateTable() {
+  const gates = detectAllGates();
+
+  if (gates.length === 0) {
+    console.log('No gates detected. Is Claude Code installed?');
+    return;
+  }
+
+  console.log('Feature Gates:');
+  console.log('');
+  console.log('  Status   │ Codename            │ Flag Name                    │ Env Override');
+  console.log('  ─────────┼─────────────────────┼──────────────────────────────┼─────────────────────────────');
+
+  for (const gate of gates) {
+    const status = !gate.detected
+      ? '  ⚫ n/a  '
+      : gate.enabled
+        ? '  ✅ on   '
+        : '  ⚪ off  ';
+    const codename = gate.codename.padEnd(19);
+    const name = gate.name.padEnd(28);
+    const env = gate.envOverride || '';
+    console.log(`${status} │ ${codename} │ ${name} │ ${env}`);
+  }
+
+  console.log('');
+
+  const patchable = detectPatchableGates().filter((g) => g.detected);
+  console.log(`Patchable gates: ${patchable.length}`);
+  console.log(`Total registered: ${getAllGates().length}`);
+}
+
+function printGateScan() {
+  const flags = scanAllFlags();
+
+  if (flags.length === 0) {
+    console.log('No tengu_* flags found. Is Claude Code installed?');
+    return;
+  }
+
+  const registeredNames = new Set(getAllGates().map((g) => g.name));
+
+  console.log(`Found ${flags.length} tengu_* flags in binary:`);
+  console.log('');
+
+  let unknownCount = 0;
+  for (const flag of flags) {
+    const isKnown = registeredNames.has(flag);
+    const marker = isKnown ? '  ✓' : '  ?';
+    console.log(`${marker} ${flag}`);
+    if (!isKnown) unknownCount++;
+  }
+
+  console.log('');
+  console.log(`Known: ${flags.length - unknownCount}  Unknown: ${unknownCount}`);
+}
+
+function runGates(args: string[]) {
+  const subCommand = args[0];
+  let cliPath: string | undefined;
+
+  // Extract --cli option
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--cli' && args[i + 1]) {
+      cliPath = args[++i];
+    }
+  }
+
+  // No subcommand — list gates
+  if (!subCommand || subCommand === 'list') {
+    printGateTable();
+    return;
+  }
+
+  if (subCommand === 'scan') {
+    printGateScan();
+    return;
+  }
+
+  if (subCommand === 'reset') {
+    console.log('Resetting all gates to defaults...');
+    const result = resetGates(cliPath);
+    if (!result.success) {
+      console.log('❌ Reset failed:', result.error);
+      process.exit(1);
+    }
+    console.log('✅ Gates reset from backup:', result.backupPath);
+    return;
+  }
+
+  if (subCommand === 'enable') {
+    const target = args[1];
+
+    if (target === '--all') {
+      console.log('Enabling all patchable gates...');
+      const result = enableAllGates({ cliPath });
+      if (!result.success) {
+        console.log('❌ Enable failed:', result.error);
+        process.exit(1);
+      }
+      console.log('✅ Gates enabled:');
+      for (const g of result.gatesChanged) {
+        console.log(`  • ${g.codename} (${g.name})`);
+      }
+      if (result.backupPath) {
+        console.log('Backup:', result.backupPath);
+      }
+      return;
+    }
+
+    if (!target || target.startsWith('-')) {
+      console.log('Usage: claude-patcher gates enable <gate-name>');
+      console.log('       claude-patcher gates enable --all');
+      console.log('');
+      console.log('Available gates: swarm, team');
+      process.exit(1);
+    }
+
+    console.log(`Enabling gate: ${target}...`);
+    const result = enableGate(target, { cliPath });
+    if (!result.success) {
+      console.log('❌ Enable failed:', result.error);
+      process.exit(1);
+    }
+    for (const g of result.gatesChanged) {
+      console.log(`✅ ${g.codename} (${g.name}) — enabled`);
+    }
+    if (result.backupPath) {
+      console.log('Backup:', result.backupPath);
+    }
+    return;
+  }
+
+  if (subCommand === 'disable') {
+    const target = args[1];
+    if (!target || target.startsWith('-')) {
+      console.log('Usage: claude-patcher gates disable <gate-name>');
+      process.exit(1);
+    }
+
+    console.log(`Disabling gate: ${target}...`);
+    const result = disableGate(target, { cliPath });
+    if (!result.success) {
+      console.log('❌ Disable failed:', result.error);
+      process.exit(1);
+    }
+    for (const g of result.gatesChanged) {
+      console.log(`✅ ${g.codename} (${g.name}) — disabled`);
+    }
+    return;
+  }
+
+  console.log(`Unknown gates subcommand: ${subCommand}`);
+  console.log('');
+  console.log('Available: gates, gates enable, gates disable, gates reset, gates scan');
+  process.exit(1);
+}
+
 // Main
 async function main() {
   const args = process.argv.slice(2);
@@ -344,7 +652,15 @@ async function main() {
     case 'find':
       printFind();
       break;
-      
+
+    case 'gates':
+      runGates(args.slice(1));
+      break;
+
+    case 'exec':
+      cmdExec(args.slice(1));
+      break;
+
     default:
       console.log(`Unknown command: ${command}`);
       console.log('');

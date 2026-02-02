@@ -24,3 +24,12 @@ npm-debug.log*
 
 # Test coverage
 coverage/
+
+# Claude Code config — un-ignore tracked configs
+!.claude/settings.json
+!.claude/agents/
+!.claude/commands/
+!.claude/rules/
+
+# Activity logs
+logs/
