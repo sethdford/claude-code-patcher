@@ -33,11 +33,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/anthropics/claude-code-patcher.git"
+    "url": "git+https://github.com/sethdford/claude-code-patcher.git"
   },
-  "homepage": "https://github.com/anthropics/claude-code-patcher#readme",
+  "homepage": "https://sethdford.github.io/claude-code-patcher/",
   "bugs": {
-    "url": "https://github.com/anthropics/claude-code-patcher/issues"
+    "url": "https://github.com/sethdford/claude-code-patcher/issues"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

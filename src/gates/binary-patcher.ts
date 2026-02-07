@@ -56,9 +56,11 @@ export { BINARY_PATCH_MARKER };
  * the original matched text.
  *
  * Padding strategy (in order of preference):
- *   1. Full marker:  `/*CCP:codename   *​/`  (if room)
- *   2. Short marker: `/*CCP   *​/`           (if room)
- *   3. Spaces only                           (last resort)
+ *   1. Full marker:  SLASH*CCP:codename   *SLASH  (if room)
+ *   2. Short marker: SLASH*CCP   *SLASH           (if room)
+ *   3. Spaces only                                (last resort)
+ *
+ * (SLASH = forward slash — written this way to avoid closing this comment)
  */
 export function createPaddedReplacement(
   originalMatch: string,
