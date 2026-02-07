@@ -14,9 +14,40 @@
  */
 
 import * as fs from 'fs';
+import { execSync } from 'child_process';
 import type { FeatureGate, GateResult, GateStatus, GatePatchConfig } from '../types.js';
 import { findPatchableGate, getPatchableGates, GATE_PATCH_MARKER, BINARY_PATCH_MARKER } from './registry.js';
 import { resolveBundle } from './detector.js';
+
+/**
+ * Re-sign a Mach-O binary with an ad-hoc signature.
+ *
+ * On macOS ARM64 (Apple Silicon), the kernel requires all executables to
+ * have a valid code signature. Modifying any bytes in the binary
+ * invalidates the original signature, causing the kernel to immediately
+ * kill the process (`zsh: killed`). An ad-hoc signature (`codesign --sign -`)
+ * is sufficient to satisfy the kernel's requirement.
+ *
+ * This is a no-op on non-macOS platforms.
+ */
+function resignBinary(binaryPath: string): { success: boolean; error?: string } {
+  if (process.platform !== 'darwin') {
+    return { success: true };
+  }
+
+  try {
+    execSync(`codesign --sign - --force "${binaryPath}"`, {
+      stdio: 'pipe',
+      timeout: 30_000,
+    });
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: `Failed to re-sign binary: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
 
 export { BINARY_PATCH_MARKER };
 
@@ -202,6 +233,16 @@ export function enableBinaryGate(
     return { success: false, error: 'Could not write patched binary.', gatesChanged: [] };
   }
 
+  // Re-sign binary on macOS ARM64 (kernel kills unsigned/invalid-signature Mach-O)
+  const signResult = resignBinary(bundle.path);
+  if (!signResult.success) {
+    // Restore from backup since the binary won't run without a valid signature
+    if (backupPath) {
+      try { fs.copyFileSync(backupPath, bundle.path); } catch { /* best effort */ }
+    }
+    return { success: false, error: signResult.error ?? 'Code signing failed.', gatesChanged: [] };
+  }
+
   return {
     success: true,
     backupPath,
@@ -265,6 +306,15 @@ export function enableAllBinaryGates(config?: GatePatchConfig): GateResult {
       try { fs.copyFileSync(backupPath, bundle.path); } catch { /* best effort */ }
     }
     return { success: false, error: 'Could not write patched binary.', gatesChanged: [] };
+  }
+
+  // Re-sign binary on macOS ARM64 (kernel kills unsigned/invalid-signature Mach-O)
+  const signResult = resignBinary(bundle.path);
+  if (!signResult.success) {
+    if (backupPath) {
+      try { fs.copyFileSync(backupPath, bundle.path); } catch { /* best effort */ }
+    }
+    return { success: false, error: signResult.error ?? 'Code signing failed.', gatesChanged: [] };
   }
 
   return { success: true, backupPath, gatesChanged: changed };
