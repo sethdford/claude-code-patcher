@@ -1,10 +1,210 @@
 # Claude Code Patcher
 
-**Extend Claude Code with custom native tools — no MCP required.**
+**Extend Claude Code with custom native tools and unlock hidden feature gates.**
 
-This project allows you to inject custom tools directly into the Claude Code CLI, making them available as first-class native tools alongside the built-in ones like `Read`, `Write`, `Bash`, and `TodoWrite`.
+Two capabilities:
 
-## Why Native Tools?
+1. **Tool Patching** — inject custom tools directly into the CLI, no MCP required
+2. **Feature Gates** — detect and enable Statsig feature flags (`tengu_*`) gating unreleased features
+
+Works with both **npm installs** and the **native binary** (Node.js SEA).
+
+## Quick Start — Feature Gates
+
+```bash
+# Clone and build
+git clone https://github.com/sethdford/claude-code-patcher.git
+cd claude-code-patcher
+npm install && npm run build
+
+# Scan your binary for all feature flags
+node dist/cli.js gates scan
+
+# List all known gates with status
+node dist/cli.js gates
+
+# Enable all patchable gates
+node dist/cli.js gates enable --all
+
+# Enable a single gate
+node dist/cli.js gates enable session-memory
+
+# Restart Claude Code to activate
+```
+
+No additional setup needed — gates are pure feature toggles over code already in the binary. Patching a gate makes the existing code path execute.
+
+## Quick Start — Custom Tools
+
+```bash
+# Patch Claude Code with task tools (default)
+node dist/cli.js patch
+
+# Or patch with Gastown multi-agent tools
+node dist/cli.js patch --gastown
+
+# Or use all tools
+node dist/cli.js patch --all
+```
+
+## Feature Gates
+
+Claude Code uses [Statsig](https://statsig.com) feature flags with a `tengu_*` naming convention to gate unreleased features. The patcher can detect these flags in the binary and patch their wrapper functions to force-enable them.
+
+### Gate Tiers
+
+Gates are classified by complexity based on binary analysis:
+
+| Tier | Description | Patchable? | Strategy |
+|------|-------------|------------|----------|
+| **Tier 1** | Simple wrappers — `function X(){return g9("flag",!1)}` | Yes | Patch to `return!0` |
+| **Tier 2** | Env-guarded — env var check then Statsig check | Yes | Patch to `return!0` |
+| **Tier 3** | Complex — multi-branch returns, subscription checks | Yes | Custom replacement |
+| **Tier 4** | Too complex or has side effects | No | Use env var override |
+| **Tier 5** | Inline checks with no wrapper function | No | Detection only |
+
+### Patchable Gates (v2.1.34)
+
+| Codename | Flag | Tier | Description |
+|----------|------|------|-------------|
+| `workout-v2` | `tengu_workout2` | 1 | Workout v2 feature iteration |
+| `keybinding-customization` | `tengu_keybinding_customization_release` | 1 | Custom keyboard shortcut configuration |
+| `session-memory` | `tengu_session_memory` | 1 | Persistent memory across sessions |
+| `oboe` | `tengu_oboe` | 2 | Auto Memory — `~/.claude/memory/MEMORY.md` loaded into system prompt |
+| `amber-flint` | `tengu_amber_flint` | 2 | Agent Teams — second gate check after `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` env var |
+| `silver-lantern` | `tengu_silver_lantern` | 3 | Promo mode selector — patched to return `"promo"` |
+| `copper-lantern` | `tengu_copper_lantern` | 3 | Subscription promo banner — bypasses tier/date checks |
+| `team-mode` | `tengu_brass_pebble` | — | Team mode features (TodoWrite-adjacent) |
+
+### Env Var Override Gates (Tier 4)
+
+These are too complex or have side effects. Use environment variables instead of patching:
+
+| Codename | Flag | Env Var | Description |
+|----------|------|---------|-------------|
+| `chomp-inflection` | `tengu_chomp_inflection` | `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=1` | Prompt suggestions after responses |
+| `vinteuil-phrase` | `tengu_vinteuil_phrase` | `CLAUDE_CODE_SIMPLE=1` | Simplified system prompt variant |
+
+Add these to `~/.claude/settings.json`:
+
+```json
+{
+  "env": {
+    "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "1",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  }
+}
+```
+
+### Detection-Only Gates
+
+An additional 20+ gates are detected but not patchable (inline checks or unknown purpose). Use `gates scan` to see all `tengu_*` flags in your binary.
+
+### CLI Commands — Gates
+
+```bash
+# List all known gates with detection status
+node dist/cli.js gates
+
+# Enable a specific gate (by codename or flag name)
+node dist/cli.js gates enable session-memory
+node dist/cli.js gates enable tengu_oboe
+
+# Enable all patchable gates at once
+node dist/cli.js gates enable --all
+
+# Disable a gate (restores from backup)
+node dist/cli.js gates disable session-memory
+
+# Reset all gates to original state from backup
+node dist/cli.js gates reset
+
+# Scan binary for all tengu_* flags (including unregistered ones)
+node dist/cli.js gates scan
+```
+
+### How Gate Patching Works
+
+**For native binaries** (e.g. `~/.local/bin/claude`):
+
+1. Reads the binary as `latin1` to preserve byte offsets
+2. Matches gate wrapper functions using reverse-engineered regex patterns
+3. Replaces the function body with `return!0` (or custom value)
+4. Pads the replacement to the **exact byte length** of the original using JS block comments
+5. Creates a backup at `<binary>.backup.<timestamp>`
+
+**For JS bundles** (npm installs):
+
+1. Reads the JS file as `utf8`
+2. Uses the same regex patterns to find gate functions
+3. Replaces with an annotated version including a patch marker comment
+4. Creates a backup before modifying
+
+Byte-exact patching is critical for native binaries — the Node.js SEA format requires the embedded JS to maintain its exact byte offsets.
+
+### Programmatic API — Gates
+
+```typescript
+import {
+  detectAllGates,
+  detectPatchableGates,
+  scanAllFlags,
+  enableGate,
+  enableAllGates,
+  resetGates,
+} from 'claude-code-patcher/gates';
+
+// Detect all registered gates
+const gates = detectAllGates();
+for (const gate of gates) {
+  console.log(`${gate.codename}: detected=${gate.detected}, enabled=${gate.enabled}`);
+}
+
+// Enable a single gate
+const result = enableGate('session-memory');
+console.log(result.success, result.gatesChanged);
+
+// Enable all patchable gates
+const allResult = enableAllGates();
+console.log(`Enabled ${allResult.gatesChanged.length} gates`);
+
+// Scan for all tengu_* flags in binary
+const flags = scanAllFlags();
+console.log(`Found ${flags.length} flags`);
+
+// Reset to backup
+resetGates();
+```
+
+### Architecture
+
+```
+src/gates/
+  registry.ts        # Gate definitions, regex patterns, patch functions
+  registry.test.ts   # 46 tests covering all tiers
+  detector.ts        # Binary/JS bundle reading and gate detection
+  patcher.ts         # JS bundle patching (utf8)
+  binary-patcher.ts  # Native binary patching (latin1, byte-exact)
+  index.ts           # Barrel exports
+
+src/cli-finder.ts    # Locates Claude Code (native binary + npm)
+src/cli.ts           # CLI entry point
+```
+
+### Adding a New Gate
+
+1. Find the gate function in the binary: `strings ~/.local/bin/claude | grep tengu_your_gate`
+2. Extract the full function signature (walk backward to `function`, forward to closing `}`)
+3. Write a `detectRegex` that matches the function — use `[\w$]+` for minified names
+4. Add to `PATCHABLE_GATES` in `registry.ts` (use `returnTruePatcher()` helper for simple gates)
+5. Add tests in `registry.test.ts`
+6. Build and verify: `npm run build && node dist/cli.js gates`
+
+---
+
+## Custom Tools
+
+### Why Native Tools?
 
 | Feature | MCP Tools | Native Tools (this project) |
 |---------|-----------|---------------------------|
@@ -14,53 +214,9 @@ This project allows you to inject custom tools directly into the Claude Code CLI
 | UI | Basic | Full Claude Code UI |
 | Reliability | Server must be running | Always available |
 
-## Quick Start
+### Built-in Tool Sets
 
-```bash
-# Install
-npm install -g claude-code-patcher
-
-# Patch Claude Code with task tools (default)
-claude-patcher patch
-
-# Or patch with Gastown multi-agent tools
-claude-patcher patch --gastown
-
-# Or use all tools
-claude-patcher patch --all
-
-# Try it!
-claude
-> Who am I?
-> Create a bead to implement user authentication
-> List all beads
-> Check my mail
-```
-
-### Multi-Agent Workflow
-
-With Gastown tools, multiple Claude Code instances can coordinate:
-
-```bash
-# Terminal 1 (Agent A)
-claude
-> Create a bead to implement the API endpoints
-> Create a convoy called "API Sprint" with that bead
-> Sling the bead to agent-b
-
-# Terminal 2 (Agent B) 
-claude
-> Who am I?
-> Check my mail
-> Update bead gt-00001 status to in_progress
-> Send mail to agent-a: "Starting work on API endpoints"
-```
-
-## Built-in Tools
-
-### Task Tools (Default)
-
-Simple task management, similar to TodoWrite:
+**Task Tools** (default) — simple task management:
 
 | Tool | Description |
 |------|-------------|
@@ -69,79 +225,18 @@ Simple task management, similar to TodoWrite:
 | **TaskUpdate** | Update status (open/in_progress/blocked/resolved), add comments |
 | **TaskList** | List all tasks with optional status filter |
 
-Tasks are stored in `~/.claude/tasks.json`.
+**Gastown Tools** — multi-agent orchestration ([Gastown](https://github.com/steveyegge/gastown)):
 
-### Gastown Tools (Multi-Agent)
+| Category | Tools | Description |
+|----------|-------|-------------|
+| **Beads** | BeadCreate, BeadGet, BeadUpdate, BeadList | Issue/work item tracking |
+| **Convoys** | ConvoyCreate, ConvoyAdd, ConvoyShow, ConvoyList | Bundle beads into work units |
+| **Agents** | AgentSling, AgentList | Assign work across agents |
+| **Hooks** | HookWrite, HookRead | Persistent state across restarts |
+| **Mail** | MailSend, MailCheck, MailReply | Inter-agent messaging |
+| **Identity** | WhoAmI | Agent identity and context |
 
-Full [Gastown](https://github.com/steveyegge/gastown) integration for multi-agent orchestration:
-
-**Beads (Issue Tracking):**
-| Tool | Description |
-|------|-------------|
-| **BeadCreate** | Create work items with title, description, tags, blockers |
-| **BeadGet** | Retrieve bead details including comments and history |
-| **BeadUpdate** | Update status, add comments, change assignee |
-| **BeadList** | Filter beads by status, assignee, rig, or convoy |
-
-**Convoys (Work Bundles):**
-| Tool | Description |
-|------|-------------|
-| **ConvoyCreate** | Bundle beads into coordinated work units |
-| **ConvoyAdd** | Add beads to existing convoys |
-| **ConvoyShow** | View convoy progress and bead statuses |
-| **ConvoyList** | List all convoys with status |
-
-**Agent Coordination:**
-| Tool | Description |
-|------|-------------|
-| **AgentSling** | Assign beads to agents (like `gt sling`) |
-| **AgentList** | See all agents and their assignments |
-
-**Hooks (Persistent State):**
-| Tool | Description |
-|------|-------------|
-| **HookWrite** | Save state that survives restarts |
-| **HookRead** | Recover saved state |
-
-**Mail (Inter-Agent Messaging):**
-| Tool | Description |
-|------|-------------|
-| **MailSend** | Send messages to other agents |
-| **MailCheck** | Check mailbox for messages |
-| **MailReply** | Reply to received messages |
-
-**Identity:**
-| Tool | Description |
-|------|-------------|
-| **WhoAmI** | Get your agent ID, assignments, and context |
-
-Gastown state is stored in `~/.gastown/store.json` (shared across all Claude instances).
-
-## CLI Commands
-
-```bash
-# Patch with built-in tools
-claude-patcher patch
-
-# Patch with custom tools
-claude-patcher patch --config ./my-tools.js
-
-# Check status
-claude-patcher status
-
-# List available built-in tools
-claude-patcher list
-
-# Find all Claude Code installations
-claude-patcher find
-
-# Remove patch
-claude-patcher unpatch
-```
-
-## Creating Custom Tools
-
-### 1. Create a tools config file
+### Creating Custom Tools
 
 ```javascript
 // my-tools.js
@@ -153,22 +248,11 @@ export default [
     inputSchema: {
       type: 'object',
       properties: {
-        location: {
-          type: 'string',
-          description: 'City name or coordinates'
-        }
+        location: { type: 'string', description: 'City name or coordinates' }
       },
       required: ['location']
     },
-    outputSchema: {
-      type: 'object',
-      properties: {
-        temperature: { type: 'number' },
-        conditions: { type: 'string' }
-      }
-    },
     async execute(input) {
-      // Your implementation
       const response = await fetch(`https://api.weather.com/${input.location}`);
       return await response.json();
     }
@@ -176,71 +260,21 @@ export default [
 ];
 ```
 
-### 2. Apply your tools
-
 ```bash
-claude-patcher patch --config ./my-tools.js
+node dist/cli.js patch --config ./my-tools.js
 ```
 
-### 3. Use in Claude
-
-```
-> What's the weather in San Francisco?
-```
-
-## Programmatic API
-
-```typescript
-import { patch, unpatch, getPatchStatus, taskTools } from 'claude-code-patcher';
-import type { CustomToolDefinition } from 'claude-code-patcher';
-
-// Check status
-const status = getPatchStatus();
-console.log('Patched:', status.isPatched);
-console.log('Tools:', status.tools);
-
-// Patch with built-in tools
-patch({ tools: taskTools });
-
-// Create custom tools
-const myTool: CustomToolDefinition = {
-  name: 'Calculator',
-  description: 'Perform mathematical calculations',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      expression: {
-        type: 'string',
-        description: 'Math expression to evaluate'
-      }
-    },
-    required: ['expression']
-  },
-  async execute(input) {
-    // Note: Use a safe evaluator in production!
-    const result = eval(input.expression);
-    return { result };
-  }
-};
-
-patch({ tools: [myTool] });
-
-// Remove patch
-unpatch();
-```
-
-## Tool Definition Reference
+### Tool Definition Reference
 
 ```typescript
 interface CustomToolDefinition {
-  // Required
   name: string;              // Unique tool name
   description: string;       // Shown to the AI
   inputSchema: JsonSchema;   // Input validation
   execute: (input, context) => Promise<any>;  // Implementation
 
   // Optional
-  prompt?: string;           // Additional guidance for AI
+  prompt?: string;           // Additional AI guidance
   outputSchema?: JsonSchema; // Output validation
   displayName?: string;      // User-facing name
   icon?: string;             // Emoji for UI
@@ -249,25 +283,20 @@ interface CustomToolDefinition {
 }
 ```
 
-## JSON Schema Format
+### CLI Commands — Tools
 
-```typescript
-interface JsonSchema {
-  type: 'object' | 'array' | 'string' | 'number' | 'boolean';
-  properties?: Record<string, {
-    type: 'string' | 'number' | 'boolean' | 'array' | 'object';
-    description?: string;
-    enum?: string[];         // For string enums
-    items?: JsonSchemaProperty;  // For arrays
-    optional?: boolean;      // Defaults to required
-  }>;
-  required?: string[];       // Required property names
-}
+```bash
+node dist/cli.js patch                    # Patch with task tools
+node dist/cli.js patch --gastown          # Patch with Gastown tools
+node dist/cli.js patch --all              # Patch with all tools
+node dist/cli.js patch --config ./tools.js # Patch with custom tools
+node dist/cli.js unpatch                  # Remove tool patch
+node dist/cli.js status                   # Check patch status
+node dist/cli.js list                     # List available tools
+node dist/cli.js find                     # Find Claude Code installations
 ```
 
-## Cross-Instance Collaboration
-
-The Gastown tools enable multiple Claude Code instances to work together:
+### Cross-Instance Collaboration
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
@@ -275,9 +304,7 @@ The Gastown tools enable multiple Claude Code instances to work together:
 │    (Mayor)      │     │   (Worker A)    │     │   (Worker B)    │
 └────────┬────────┘     └────────┬────────┘     └────────┬────────┘
          │                       │                       │
-         │    ┌──────────────────┴───────────────────────┤
-         │    │                                          │
-         ▼    ▼                                          ▼
+         ▼                       ▼                       ▼
     ┌─────────────────────────────────────────────────────────┐
     │              ~/.gastown/store.json                       │
     │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐    │
@@ -286,81 +313,121 @@ The Gastown tools enable multiple Claude Code instances to work together:
     └─────────────────────────────────────────────────────────┘
 ```
 
-**Key Features:**
+---
 
-1. **Shared State**: All Claude instances read/write to the same store
-2. **Mailbox System**: Agents can send messages to each other
-3. **Work Assignment**: Sling beads to specific agents
-4. **Persistent Hooks**: State survives agent restarts
-5. **Identity Awareness**: Each agent knows who they are (`WhoAmI`)
+## CLI Installation Detection
 
-**Environment Variables:**
+The patcher automatically finds your Claude Code installation. Detection order:
+
+1. **Native binary** — `which claude` resolved path (highest priority)
+2. **~/.local/bin/claude** — standard installer location
+3. **~/.local/share/claude/versions/** — versioned binaries (newest first)
+4. **npm installs** — global, local, and npx cache
+
+Use `--cli <path>` to override auto-detection:
 
 ```bash
-# Set custom agent ID (otherwise auto-generated)
-export GT_AGENT_ID=mayor
-
-# Set custom Gastown home (otherwise ~/.gastown)
-export GT_HOME=/path/to/gastown
-
-# Set custom tasks file for task tools
-export CLAUDE_TASKS_FILE=/path/to/tasks.json
+node dist/cli.js gates --cli /path/to/claude
+node dist/cli.js patch --cli /path/to/cli.js
 ```
 
-## How It Works
+## Environment Variables
 
-The patcher performs targeted modifications to the Claude Code CLI:
+```bash
+# Gastown
+export GT_AGENT_ID=mayor                    # Custom agent ID
+export GT_HOME=/path/to/gastown             # Custom Gastown home
+export CLAUDE_TASKS_FILE=/path/to/tasks.json # Custom tasks file
 
-1. **Locates** the Claude Code CLI installation
-2. **Analyzes** the minified JavaScript to find the tools array
-3. **Injects** custom tool definitions using the same structure as built-in tools
-4. **Modifies** the tools collection to include custom tools
+# Claude Code feature env vars (add to ~/.claude/settings.json)
+CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1      # Enable agent teams
+CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=1      # Enable prompt suggestions
+CLAUDE_CODE_DISABLE_AUTO_MEMORY=1           # Disable auto memory (oboe)
+CLAUDE_CODE_SIMPLE=1                        # Simplified system prompt
+```
 
-The patch is based on reverse engineering of Claude Code's internal tool system, specifically:
-- The `aU` function that builds the tools array
-- The tool interface used by `TodoWrite` and other built-in tools
-- The Zod schema validation system
+## Development
+
+```bash
+# Build
+npm run build
+
+# Run tests (248 tests across 10 files)
+npx vitest run
+
+# Run a specific test file
+npx vitest run src/gates/registry.test.ts
+
+# Type check
+npx tsc --noEmit
+```
+
+### Test Coverage
+
+| Test File | Tests | Covers |
+|-----------|-------|--------|
+| `registry.test.ts` | 46 | Gate definitions, regex matching, patch/unpatch for all tiers |
+| `binary-patcher.test.ts` | 27 | Byte-exact padding, binary gate patching |
+| `patcher.test.ts` | 19 | JS bundle patching, enable/disable flows |
+| `detector.test.ts` | 16 | Bundle resolution, gate detection |
+| `cli-gates.test.ts` | 16 | CLI integration, scan output |
+| *(x2 — src + dist)* | — | Tests run against both TypeScript source and compiled output |
 
 ## Version Compatibility
 
-| Claude Code Version | Status |
-|---------------------|--------|
-| 2.1.x | ✅ Tested |
-| 2.0.x | ✅ Tested |
-| 1.x | ⚠️ May work |
+| Claude Code Version | Install Type | Gates | Tools |
+|---------------------|-------------|-------|-------|
+| 2.1.34 | Native binary | Validated (8 patchable, 22 detection-only) | Untested |
+| 2.1.x | npm | Detection works | Tested |
+| 2.0.x | npm | Detection works | Tested |
 
-The patcher automatically detects structural changes and will warn if incompatible.
+Gate regex patterns use `[\w$]+` for minified identifiers, making them resilient across minor version changes. Major version updates may change function structures.
 
 ## Troubleshooting
 
-### "Could not find tools array pattern"
+### Gates show "n/a" for everything
 
-This means the Claude Code version has a different internal structure. Please open an issue with your Claude Code version.
-
-### Tools not appearing in Claude
-
-1. Restart Claude Code after patching
-2. Check status: `claude-patcher status`
-3. Verify the CLI path: `claude-patcher find`
-
-### Restoring original CLI
+The patcher may be finding a stale npm install instead of the active native binary. Check with:
 
 ```bash
-# Use unpatch
-claude-patcher unpatch
+node dist/cli.js find
+```
+
+If it shows an npm path but you use the native binary, specify it explicitly:
+
+```bash
+node dist/cli.js gates --cli ~/.local/bin/claude
+```
+
+### "Could not find tools array pattern"
+
+The Claude Code version has a different internal structure. Open an issue with your version.
+
+### Gates enabled but feature not working
+
+1. **Restart Claude Code** — the patched binary must be re-executed
+2. Some features may need companion gates (e.g., `session-memory` may need `tengu_sm_compact`)
+3. Check if the feature has an env var override that's set to disable it
+
+### Restoring original binary
+
+```bash
+# From backup (preferred)
+node dist/cli.js gates reset
 
 # Or reinstall Claude Code
-npm install -g @anthropic-ai/claude-code
+claude update
+# or: npm install -g @anthropic-ai/claude-code
 ```
 
 ## Contributing
 
-Contributions welcome! Areas of interest:
+Areas of interest:
 
-- Additional built-in tool templates
-- Support for more Claude Code versions
+- New gate discoveries (run `gates scan` on new versions)
+- Regex pattern updates when function signatures change
+- Promoting detection-only gates to patchable
 - Better error handling and recovery
-- Documentation improvements
 
 ## License
 
@@ -368,4 +435,4 @@ MIT
 
 ## Disclaimer
 
-This is an unofficial project and is not affiliated with Anthropic. Use at your own risk. The patch modifies the Claude Code CLI and may break with updates.
+This is an unofficial project and is not affiliated with Anthropic. Use at your own risk. The patcher modifies the Claude Code CLI binary and may break with updates. Always keep backups.
