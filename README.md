@@ -83,13 +83,14 @@ These gates are detected in the binary but are either too complex to patch or ha
 | `thinkback` | `tengu_thinkback` | Year-in-review animation skill (inline, Tier 5) |
 | `system-prompt-global-cache` | `tengu_system_prompt_global_cache` | Global prompt cache. Env: `CLAUDE_CODE_FORCE_GLOBAL_CACHE` |
 
-Plus 13 gates with unknown purpose: `marble-anvil`, `marble-kite`, `coral-fern`, `quiet-fern`, `plank-river-frost`, `quartz-lantern`, `scarf-coffee`, `cache-plum-violet`, `flicker`, `tool-pear`, `cork-m4q`, `tst-kx7`, `plum-vx3`, `kv7-prompt-sort`, `workout`.
+Plus 15 reverse-engineered gates: `marble-anvil` (clear thinking beta), `marble-kite` (write/edit guardrail bypass), `coral-fern` (past session access), `quiet-fern` (VS Code experiment), `plank-river-frost` (prompt suggestions), `scarf-coffee` (conditional tool injection), `cork-m4q` (policy spec injection), `tst-kx7` (tool search experiment), `plum-vx3` (WebSearch behavior), `tool-pear` (tool schema filtering), `flicker` (TUI telemetry), `quartz-lantern` (subscription), `cache-plum-violet` (cache variant), `kv7-prompt-sort` (prompt reordering), `workout` (v1, superseded).
 
 ## Flag Taxonomy
 
-Of the **572+ `tengu_*` flags** in the binary, most are telemetry event names (passed to `logEvent()`), not feature gates. The ~30 codename-style gates above are the ones that control feature availability via `checkGate()`.
+Of the **605 unique `tengu_*` flags** in the v2.1.37 binary, most are telemetry event names (passed to `logEvent()`), not feature gates. The ~30 codename-style gates above are the ones that control feature availability via `checkGate()`. Additionally, 114 `CLAUDE_CODE_*` env vars, 23 `DISABLE_*` toggles, and 12 `ENABLE_*` toggles provide runtime feature control.
 
 See [docs/TENGU-FLAGS.md](docs/TENGU-FLAGS.md) for the complete flag catalog organized by category.
+See [docs/ENV-VARS.md](docs/ENV-VARS.md) for the complete environment variable reference.
 
 ## Environment Variable Overrides
 

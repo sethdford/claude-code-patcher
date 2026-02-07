@@ -168,9 +168,12 @@ describe('Gate Registry', () => {
       }
     });
 
-    it('should return empty array for category with no gates', () => {
+    it('should return telemetry gates', () => {
       const telemetry = getGatesByCategory('telemetry');
-      expect(telemetry).toEqual([]);
+      expect(telemetry.length).toBeGreaterThan(0);
+      for (const gate of telemetry) {
+        expect(gate.category).toBe('telemetry');
+      }
     });
   });
 

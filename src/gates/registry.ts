@@ -57,11 +57,11 @@ function returnTruePatcher(codename: string) {
  * Function/variable names use [\w$]+ to survive different minification runs.
  */
 const PATCHABLE_GATES: FeatureGate[] = [
-  // ── Existing: brass_pebble ─────────────────────────────────────────
+  // ── Existing: brass_pebble (removed in v2.1.37 — swarm mode fully rolled out) ──
   {
     name: 'tengu_brass_pebble',
     codename: 'swarm-mode',
-    description: 'Swarm/TeammateTool/delegate gate — enables multi-agent coordination',
+    description: 'Swarm/TeammateTool/delegate gate — enables multi-agent coordination (removed/ungated in v2.1.37)',
     category: 'feature',
     detectRegex:
       /function\s+([a-zA-Z_$][\w$]*)\(\)\{if\([\w$]+\(process\.env\.CLAUDE_CODE_AGENT_SWARMS\)\)return!1;return\s*[\w$]+\("tengu_brass_pebble",!1\)\}/,
@@ -144,10 +144,12 @@ const PATCHABLE_GATES: FeatureGate[] = [
   {
     name: 'tengu_silver_lantern',
     codename: 'silver-lantern',
-    description: 'Promo mode selector — returns "promo" or "launch-only" based on subscription state',
+    description: 'Promo mode selector — returns "promo"/"promo-copper" or "launch-only" based on subscription state',
     category: 'feature',
+    // v2.1.37: if(sgT())return pB()?"promo-copper":"promo"  (ternary added)
+    // v2.1.34: if(sgT())return"promo"
     detectRegex:
-      /function\s+([a-zA-Z_$][\w$]*)\(\)\{if\(![\w$]+\("tengu_silver_lantern",!1\)\)return null;if\([\w$]+\(\)\)return"promo";if\([\w$]+\(\)\)return"launch-only";return null\}/,
+      /function\s+([a-zA-Z_$][\w$]*)\(\)\{if\(![\w$]+\("tengu_silver_lantern",!1\)\)return null;if\([\w$]+\(\)\)return[\w$() ?":+-]*"promo(?:-copper)?";if\([\w$]+\(\)\)return"launch-only";return null\}/,
     patchFn(content: string, match: RegExpMatchArray): string {
       return content.replace(
         match[0],
@@ -258,7 +260,7 @@ const DETECTION_ONLY_GATES: FeatureGate[] = [
   {
     name: 'tengu_marble_anvil',
     codename: 'marble-anvil',
-    description: 'Unknown feature gate',
+    description: 'Clear thinking beta (clear_thinking_20251015) — adds thinking edits when enabled with thinking mode',
     category: 'feature',
     detectRegex: /tengu_marble_anvil/,
     patchFn: (c: string) => c,
@@ -267,7 +269,7 @@ const DETECTION_ONLY_GATES: FeatureGate[] = [
   {
     name: 'tengu_marble_kite',
     codename: 'marble-kite',
-    description: 'Unknown feature gate',
+    description: 'Write/Edit guardrail bypass — removes "must read file before editing/writing" restriction',
     category: 'feature',
     detectRegex: /tengu_marble_kite/,
     patchFn: (c: string) => c,
@@ -276,7 +278,7 @@ const DETECTION_ONLY_GATES: FeatureGate[] = [
   {
     name: 'tengu_coral_fern',
     codename: 'coral-fern',
-    description: 'Unknown feature gate',
+    description: 'Past session access — adds system prompt instructions for accessing past session data',
     category: 'feature',
     detectRegex: /tengu_coral_fern/,
     patchFn: (c: string) => c,
@@ -285,7 +287,7 @@ const DETECTION_ONLY_GATES: FeatureGate[] = [
   {
     name: 'tengu_quiet_fern',
     codename: 'quiet-fern',
-    description: 'Unknown feature gate',
+    description: 'VS Code extension experiment gate — sent alongside penguins_enabled to IDE extensions',
     category: 'feature',
     detectRegex: /tengu_quiet_fern/,
     patchFn: (c: string) => c,
@@ -294,7 +296,7 @@ const DETECTION_ONLY_GATES: FeatureGate[] = [
   {
     name: 'tengu_plank_river_frost',
     codename: 'plank-river-frost',
-    description: 'Unknown feature gate',
+    description: 'Prompt suggestion mode — controls the SUGGESTION MODE system prompt for next-prompt suggestions',
     category: 'feature',
     detectRegex: /tengu_plank_river_frost/,
     patchFn: (c: string) => c,
@@ -312,7 +314,7 @@ const DETECTION_ONLY_GATES: FeatureGate[] = [
   {
     name: 'tengu_scarf_coffee',
     codename: 'scarf-coffee',
-    description: 'Unknown feature gate',
+    description: 'Conditional tool injection — adds a tool to the tool list when enabled alongside another condition',
     category: 'feature',
     detectRegex: /tengu_scarf_coffee/,
     patchFn: (c: string) => c,
@@ -330,8 +332,8 @@ const DETECTION_ONLY_GATES: FeatureGate[] = [
   {
     name: 'tengu_flicker',
     codename: 'flicker',
-    description: 'Unknown feature gate',
-    category: 'feature',
+    description: 'Terminal UI flicker telemetry — tracks resize flickers in TUI (not a feature gate, telemetry only)',
+    category: 'telemetry',
     detectRegex: /tengu_flicker/,
     patchFn: (c: string) => c,
     unpatchFn: (c: string) => c,
@@ -339,8 +341,8 @@ const DETECTION_ONLY_GATES: FeatureGate[] = [
   {
     name: 'tengu_tool_pear',
     codename: 'tool-pear',
-    description: 'Unknown tool-related feature gate',
-    category: 'feature',
+    description: 'Tool schema filtering — controls how tool inputJSONSchema is presented to the model (experiment)',
+    category: 'experiment',
     detectRegex: /tengu_tool_pear/,
     patchFn: (c: string) => c,
     unpatchFn: (c: string) => c,
@@ -348,7 +350,7 @@ const DETECTION_ONLY_GATES: FeatureGate[] = [
   {
     name: 'tengu_cork_m4q',
     codename: 'cork-m4q',
-    description: 'Unknown feature gate',
+    description: 'Policy spec injection — controls <policy_spec> XML injection into system prompt (guardrails/safety)',
     category: 'feature',
     detectRegex: /tengu_cork_m4q/,
     patchFn: (c: string) => c,
@@ -357,7 +359,7 @@ const DETECTION_ONLY_GATES: FeatureGate[] = [
   {
     name: 'tengu_tst_kx7',
     codename: 'tst-kx7',
-    description: 'Unknown/test gate',
+    description: 'Tool search experiment — enables tool search when below threshold with deferred tools present',
     category: 'experiment',
     detectRegex: /tengu_tst_kx7/,
     patchFn: (c: string) => c,
@@ -366,7 +368,7 @@ const DETECTION_ONLY_GATES: FeatureGate[] = [
   {
     name: 'tengu_plum_vx3',
     codename: 'plum-vx3',
-    description: 'Unknown feature gate',
+    description: 'WebSearch behavior — disables thinking, forces web_search tool choice, uses alternate model when enabled',
     category: 'feature',
     detectRegex: /tengu_plum_vx3/,
     patchFn: (c: string) => c,
@@ -384,7 +386,7 @@ const DETECTION_ONLY_GATES: FeatureGate[] = [
   {
     name: 'tengu_workout',
     codename: 'workout',
-    description: 'Unknown feature gate (superseded by workout2)',
+    description: 'Workout v1 — original evaluation/training workflow feature (superseded by workout2)',
     category: 'feature',
     detectRegex: /tengu_workout/,
     patchFn: (c: string) => c,

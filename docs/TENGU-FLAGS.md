@@ -1,6 +1,8 @@
 # Tengu Flags — Complete Reference
 
-> All 572 `tengu_*` flags extracted from the Claude Code binary, organized by category.
+> All 605 `tengu_*` flags extracted from Claude Code v2.1.37 (Mach-O ARM64 binary), organized by category.
+>
+> Last scan: 2026-02-07 | Previous: 572 flags | Delta: +39 added, -5 removed
 
 Tengu flags are [Statsig](https://statsig.com/) identifiers used for feature gating,
 telemetry, and experimentation in Claude Code. Most are telemetry event names;
@@ -12,28 +14,115 @@ These opaque, randomly-named flags are Statsig feature gates that enable or disa
 functionality. Their names reveal nothing about purpose — they must be
 reverse-engineered from the binary.
 
-| Flag | Codename | Patchable? | Purpose |
-|------|----------|------------|---------|
-| `tengu_brass_pebble` | swarm-mode | Yes | Swarm/TeammateTool/delegate gate |
-| `tengu_marble_anvil` | marble-anvil | No | Unknown feature gate |
-| `tengu_marble_kite` | marble-kite | No | Unknown feature gate |
-| `tengu_coral_fern` | coral-fern | No | Unknown feature gate |
-| `tengu_quiet_fern` | quiet-fern | No | Unknown feature gate |
-| `tengu_plank_river_frost` | plank-river-frost | No | Unknown feature gate |
-| `tengu_quartz_lantern` | quartz-lantern | No | Unknown feature gate |
-| `tengu_scarf_coffee` | scarf-coffee | No | Unknown feature gate |
-| `tengu_cache_plum_violet` | cache-plum-violet | No | Cache feature |
-| `tengu_flicker` | flicker | No | Unknown feature gate |
-| `tengu_tool_pear` | tool-pear | No | Unknown feature gate |
-| `tengu_cork_m4q` | cork-m4q | No | Unknown feature gate |
-| `tengu_tst_kx7` | tst-kx7 | No | Unknown/test gate |
-| `tengu_plum_vx3` | plum-vx3 | No | Unknown feature gate |
-| `tengu_kv7_prompt_sort` | kv7-prompt-sort | No | Prompt sorting feature |
-| `tengu_workout` | workout | No | Unknown feature gate |
+### Patchable Gates (9)
 
-## API & Networking
+| Flag | Codename | Tier | Env Override | Purpose |
+|------|----------|------|-------------|---------|
+| `tengu_brass_pebble` | swarm-mode | 2 | `CLAUDE_CODE_AGENT_SWARMS` | Swarm/TeammateTool/delegate gate |
+| `tengu_brass_pebble` | team-mode | 3 | `CLAUDE_CODE_TEAM_MODE` | Team mode task/team features |
+| `tengu_workout2` | workout-v2 | 1 | | Workout v2 feature iteration |
+| `tengu_keybinding_customization_release` | keybinding-customization | 1 | | Custom keyboard shortcut configuration |
+| `tengu_session_memory` | session-memory | 1 | | Persistent memory across sessions |
+| `tengu_oboe` | oboe | 2 | `CLAUDE_CODE_DISABLE_AUTO_MEMORY` | Auto Memory (~/.claude/memory/MEMORY.md) |
+| `tengu_amber_flint` | amber-flint | 2 | `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | Agent Teams feature gate |
+| `tengu_silver_lantern` | silver-lantern | 3 | | Promo mode selector (subscription-based) |
+| `tengu_copper_lantern` | copper-lantern | 3 | | Pro/Max subscription promo banner |
 
-Flags related to API communication, retries, and error handling.
+### Detection-Only Gates (20)
+
+| Flag | Codename | Tier | Purpose |
+|------|----------|------|---------|
+| `tengu_chomp_inflection` | chomp-inflection | 4 | Prompt suggestions. Env: `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION` |
+| `tengu_vinteuil_phrase` | vinteuil-phrase | 4 | Simplified system prompt. Env: `CLAUDE_CODE_SIMPLE` |
+| `tengu_speculation` | speculation | 5 | Speculative pre-execution of likely tool calls |
+| `tengu_structured_output_enabled` | structured-output | 5 | Structured/typed model responses |
+| `tengu_streaming_tool_execution2` | streaming-tool-exec-v2 | 5 | Execute tools while model still streaming |
+| `tengu_thinkback` | thinkback | 5 | Year-in-review animation skill |
+| `tengu_system_prompt_global_cache` | system-prompt-global-cache | 5 | Global prompt cache. Env: `CLAUDE_CODE_FORCE_GLOBAL_CACHE` |
+| `tengu_marble_anvil` | marble-anvil | ? | Unknown feature gate |
+| `tengu_marble_kite` | marble-kite | ? | Unknown feature gate (18 occurrences — high for a gate) |
+| `tengu_coral_fern` | coral-fern | ? | Unknown feature gate |
+| `tengu_quiet_fern` | quiet-fern | ? | Unknown feature gate |
+| `tengu_plank_river_frost` | plank-river-frost | ? | Unknown feature gate |
+| `tengu_quartz_lantern` | quartz-lantern | ? | Lantern family — related to copper/silver lantern |
+| `tengu_scarf_coffee` | scarf-coffee | ? | Unknown feature gate |
+| `tengu_cache_plum_violet` | cache-plum-violet | ? | Cache-related feature |
+| `tengu_flicker` | flicker | ? | Unknown feature gate |
+| `tengu_tool_pear` | tool-pear | ? | Tool-related feature gate |
+| `tengu_cork_m4q` | cork-m4q | ? | Unknown feature gate |
+| `tengu_tst_kx7` | tst-kx7 | ? | Test/experiment gate (9 occurrences) |
+| `tengu_plum_vx3` | plum-vx3 | ? | Unknown feature gate |
+| `tengu_kv7_prompt_sort` | kv7-prompt-sort | ? | Prompt sorting for cache efficiency |
+| `tengu_workout` | workout | ? | Superseded by workout2 |
+
+### Gate Tier Definitions
+
+- **Tier 1** — Simple wrappers: `function X(){return checkGate("tengu_flag",!1)}`
+- **Tier 2** — Env-guarded: env var check, then Statsig check
+- **Tier 3** — Complex: multi-branch returns, subscription checks
+- **Tier 4** — Too complex: env var override preferred (detection-only)
+- **Tier 5** — Inline checks: no wrapper function (detection-only)
+- **?** — Tier not yet determined
+
+## Version Delta (v2.1.34 → v2.1.37)
+
+### New Flags (+39)
+
+| Flag | Category | Notes |
+|------|----------|-------|
+| `tengu_agent_flag` | agent | New agent flag system |
+| `tengu_agent_memory_loaded` | agent | Agent memory loading event |
+| `tengu_amber_flint` | feature gate | Agent Teams gate (promoted to patchable) |
+| `tengu_auto_compact_succeeded` | compact | Auto-compact success tracking |
+| `tengu_bash_command_interrupt_backgrounded` | bash | Background command interruption |
+| `tengu_chain_parent_cycle` | agent | Agent chain parent cycle detection |
+| `tengu_chomp_inflection` | feature gate | Prompt suggestions gate |
+| `tengu_copper_lantern` | feature gate | Pro/Max subscription promo |
+| `tengu_copper_lantern_config` | config | Copper lantern config data |
+| `tengu_fast_mode_fallback_triggered` | api | Fast mode fallback event |
+| `tengu_fast_mode_overage_rejected` | api | Fast mode overage rejection |
+| `tengu_fast_mode_prefetch_timeout` | api | Fast mode prefetch timeout |
+| `tengu_filtered_whitespace_only_assistant` | message | Whitespace-only assistant filter |
+| `tengu_marble_lantern_disabled` | feature gate | Marble lantern disabled event |
+| `tengu_memdir_accessed` | memory | Memory directory accessed |
+| `tengu_memdir_file_edit` | memory | Memory directory file edited |
+| `tengu_memdir_file_read` | memory | Memory directory file read |
+| `tengu_memdir_file_write` | memory | Memory directory file written |
+| `tengu_memdir_loaded` | memory | Memory directory loaded |
+| `tengu_model_whitespace_response` | model | Model whitespace-only response |
+| `tengu_oboe` | feature gate | Auto Memory gate |
+| `tengu_opus_46_notice_shown` | notice | Opus 4.6 notice shown |
+| `tengu_opus46_feed_shown` | notice | Opus 4.6 feed shown |
+| `tengu_opus46_upgrade_nudge_shown` | notice | Opus 4.6 upgrade nudge |
+| `tengu_org_penguin_mode_fetch_failed` | org | Org penguin mode fetch failure |
+| `tengu_partial_compact` | compact | Partial compaction event |
+| `tengu_partial_compact_failed` | compact | Partial compaction failure |
+| `tengu_pdf_reference_attachment` | attachment | PDF reference attachment |
+| `tengu_penguin_mode_promo` | subscription | Penguin mode promo |
+| `tengu_penguins_enabled` | subscription | Penguins feature enabled |
+| `tengu_penguins_off` | subscription | Penguins feature off |
+| `tengu_reduce_motion_setting_changed` | config | Reduce motion accessibility setting |
+| `tengu_session_memory_file_read` | session | Session memory file read |
+| `tengu_session_memory_loaded` | session | Session memory loaded event |
+| `tengu_silver_lantern` | feature gate | Promo mode selector gate |
+| `tengu_transcript_parent_cycle` | transcript | Transcript parent cycle |
+| `tengu_tst_names_in_messages` | experiment | Test names in messages |
+| `tengu_vinteuil_phrase` | feature gate | Simplified system prompt gate |
+| `tengu_workout2` | feature gate | Workout v2 gate |
+
+### Removed Flags (-5)
+
+| Flag | Notes |
+|------|-------|
+| `tengu_brass_pebble` | Swarm gate — may have been renamed or refactored |
+| `tengu_empty_model_response` | Replaced by `tengu_model_whitespace_response` |
+| `tengu_opus_45_notice_shown` | Replaced by `tengu_opus_46_notice_shown` |
+| `tengu_opus45_upgrade_nudge_shown` | Replaced by `tengu_opus46_upgrade_nudge_shown` |
+| `tengu_workout` | Still in detection-only registry, may be vestigial |
+
+## Telemetry Flags by Category
+
+### API & Networking (17)
 
 | Flag | Purpose |
 |------|---------|
@@ -51,25 +140,11 @@ Flags related to API communication, retries, and error handling.
 | `tengu_api_retry` | API retry event |
 | `tengu_api_success` | Successful API call |
 | `tengu_attribution_header` | Attribution header event |
-| `tengu_headless_latency` | Headless mode latency tracking |
-| `tengu_model_fallback_triggered` | Model fallback event |
-| `tengu_model_response_keyword_detected` | Response keyword detection |
-| `tengu_prompt_cache_break` | Prompt cache break event |
-| `tengu_rate_limit_options_menu_cancel` | Rate limit menu cancel |
-| `tengu_rate_limit_options_menu_select_extra_usage` | Extra usage selection |
-| `tengu_rate_limit_options_menu_select_upgrade` | Upgrade selection |
-| `tengu_refusal_api_response` | API refusal response |
-| `tengu_remote_backend` | Remote backend flag |
-| `tengu_remote_create_session` | Remote session creation |
-| `tengu_remote_create_session_error` | Remote session error |
-| `tengu_remote_create_session_success` | Remote session success |
-| `tengu_speculation` | Speculative execution flag |
-| `tengu_max_tokens_context_overflow_adjustment` | Token overflow adjustment |
-| `tengu_max_tokens_reached` | Max tokens reached |
+| `tengu_fast_mode_fallback_triggered` | Fast mode fallback event |
+| `tengu_fast_mode_overage_rejected` | Fast mode overage rejection |
+| `tengu_fast_mode_prefetch_timeout` | Fast mode prefetch timeout |
 
-## OAuth & Authentication
-
-OAuth flow events, token management, and keychain operations.
+### OAuth & Authentication (39)
 
 | Flag | Purpose |
 |------|---------|
@@ -115,9 +190,7 @@ OAuth flow events, token management, and keychain operations.
 | `tengu_oauth_tokens_saved` | Tokens saved |
 | `tengu_oauth_user_roles_error` | User roles error |
 
-## Tool Usage
-
-Permission checks, execution tracking, and tool result handling.
+### Tool Usage (22)
 
 | Flag | Purpose |
 |------|---------|
@@ -144,9 +217,7 @@ Permission checks, execution tracking, and tool result handling.
 | `tengu_tool_use_tool_result_mismatch_error` | Result mismatch error |
 | `tengu_unexpected_tool_result` | Unexpected tool result |
 
-## MCP (Model Context Protocol)
-
-MCP server connections, tool calls, and OAuth for MCP.
+### MCP (Model Context Protocol) (26)
 
 | Flag | Purpose |
 |------|---------|
@@ -177,9 +248,7 @@ MCP server connections, tool calls, and OAuth for MCP.
 | `tengu_mcp_tool_search` | MCP tool search |
 | `tengu_mcp_tools_commands_loaded` | MCP tools/commands loaded |
 
-## Session & Persistence
-
-Session memory, resumption, branching, and tagging.
+### Session & Persistence (21)
 
 | Flag | Purpose |
 |------|---------|
@@ -192,6 +261,8 @@ Session memory, resumption, branching, and tagging.
 | `tengu_session_memory` | Session memory flag |
 | `tengu_session_memory_accessed` | Session memory accessed |
 | `tengu_session_memory_extraction` | Session memory extraction |
+| `tengu_session_memory_file_read` | Session memory file read |
+| `tengu_session_memory_loaded` | Session memory loaded |
 | `tengu_session_persistence_failed` | Session persistence failed |
 | `tengu_session_preview_opened` | Session preview opened |
 | `tengu_session_quality_classification` | Session quality classification |
@@ -203,9 +274,17 @@ Session memory, resumption, branching, and tagging.
 | `tengu_session_tagged` | Session tagged |
 | `tengu_session_worktree_filter_toggled` | Worktree filter toggled |
 
-## File Operations
+### Memory Directory (5) — NEW
 
-File history, snapshots, and change tracking.
+| Flag | Purpose |
+|------|---------|
+| `tengu_memdir_accessed` | Memory directory accessed |
+| `tengu_memdir_file_edit` | Memory directory file edited |
+| `tengu_memdir_file_read` | Memory directory file read |
+| `tengu_memdir_file_write` | Memory directory file written |
+| `tengu_memdir_loaded` | Memory directory loaded |
+
+### File Operations (17)
 
 | Flag | Purpose |
 |------|---------|
@@ -226,12 +305,8 @@ File history, snapshots, and change tracking.
 | `tengu_file_suggestions_git_ls_files` | File suggestions via git ls-files |
 | `tengu_file_suggestions_ripgrep` | File suggestions via ripgrep |
 | `tengu_file_write_optimization` | File write optimization |
-| `tengu_watched_file_compression_failed` | Watched file compression failed |
-| `tengu_watched_file_stat_error` | Watched file stat error |
 
-## Compact/Summarization
-
-Auto-compaction, cache sharing, and context management.
+### Compact/Summarization (20)
 
 | Flag | Purpose |
 |------|---------|
@@ -242,6 +317,8 @@ Auto-compaction, cache sharing, and context management.
 | `tengu_compact_failed` | Compact failed |
 | `tengu_compact_streaming_retry` | Compact streaming retry |
 | `tengu_microcompact` | Micro-compaction event |
+| `tengu_partial_compact` | Partial compaction event |
+| `tengu_partial_compact_failed` | Partial compaction failure |
 | `tengu_post_autocompact_turn` | Post auto-compact turn |
 | `tengu_post_compact_file_restore_error` | Post-compact file restore error |
 | `tengu_post_compact_file_restore_success` | Post-compact file restore success |
@@ -256,9 +333,7 @@ Auto-compaction, cache sharing, and context management.
 | `tengu_sm_compact_summarized_id_not_found` | SM compact summarized ID not found |
 | `tengu_sm_compact_threshold_exceeded` | SM compact threshold exceeded |
 
-## Native Binary & Updates
-
-Binary installation, auto-updates, and version management.
+### Native Binary & Updates (22)
 
 | Flag | Purpose |
 |------|---------|
@@ -296,15 +371,15 @@ Binary installation, auto-updates, and version management.
 | `tengu_native_update_skipped_minimum_version` | Native update skipped (min version) |
 | `tengu_native_version_cleanup` | Native version cleanup |
 
-## Agent & Swarm
-
-Agent creation, tools, and stop hooks.
+### Agent & Swarm (14)
 
 | Flag | Purpose |
 |------|---------|
 | `tengu_agent_color_set` | Agent color set |
 | `tengu_agent_created` | Agent created |
 | `tengu_agent_definition_generated` | Agent definition generated |
+| `tengu_agent_flag` | Agent flag system event |
+| `tengu_agent_memory_loaded` | Agent memory loaded |
 | `tengu_agent_name_set` | Agent name set |
 | `tengu_agent_parse_error` | Agent parse error |
 | `tengu_agent_stop_hook_error` | Agent stop hook error |
@@ -317,12 +392,15 @@ Agent creation, tools, and stop hooks.
 | `tengu_subagent_at_mention` | Subagent at-mention |
 | `tengu_teammate_mode_changed` | Teammate mode changed |
 
-## IDE/Extensions
-
-Extension events, VS Code integration, and IDE commands.
+### IDE/Extensions (14)
 
 | Flag | Purpose |
 |------|---------|
+| `tengu_chrome_auto_enable` | Chrome auto-enable |
+| `tengu_claude_in_chrome_onboarding_shown` | Claude in Chrome onboarding shown |
+| `tengu_claude_in_chrome_setting_changed` | Claude in Chrome setting changed |
+| `tengu_claude_in_chrome_setup` | Claude in Chrome setup |
+| `tengu_claude_in_chrome_setup_failed` | Claude in Chrome setup failed |
 | `tengu_ext_at_mentioned` | Extension at-mentioned |
 | `tengu_ext_diff_accepted` | Extension diff accepted |
 | `tengu_ext_diff_rejected` | Extension diff rejected |
@@ -330,24 +408,18 @@ Extension events, VS Code integration, and IDE commands.
 | `tengu_ext_install_error` | Extension install error |
 | `tengu_ext_installed` | Extension installed |
 | `tengu_ext_will_show_diff` | Extension will show diff |
-| `tengu_ide_` | IDE event (partial) |
-| `tengu_vscode_` | VS Code event (partial) |
-| `tengu_vscode_onboarding` | VS Code onboarding |
-| `tengu_vscode_review_upsell` | VS Code review upsell |
 | `tengu_external_editor_hint_shown` | External editor hint shown |
 | `tengu_external_editor_used` | External editor used |
-| `tengu_chrome_auto_enable` | Chrome auto-enable |
-| `tengu_claude_in_chrome_onboarding_shown` | Claude in Chrome onboarding shown |
-| `tengu_claude_in_chrome_setting_changed` | Claude in Chrome setting changed |
-| `tengu_claude_in_chrome_setup` | Claude in Chrome setup |
-| `tengu_claude_in_chrome_setup_failed` | Claude in Chrome setup failed |
+| `tengu_ide_` | IDE event (partial prefix) |
+| `tengu_vscode_` | VS Code event (partial prefix) |
+| `tengu_vscode_onboarding` | VS Code onboarding |
+| `tengu_vscode_review_upsell` | VS Code review upsell |
 
-## Permissions & Security
-
-Permission prompts, bypass modes, and trust dialogs.
+### Permissions & Security (11)
 
 | Flag | Purpose |
 |------|---------|
+| `tengu_bash_security_check_triggered` | Bash security check (63 occurrences — highest) |
 | `tengu_bypass_permissions_mode_dialog_accept` | Bypass permissions accept |
 | `tengu_bypass_permissions_mode_dialog_shown` | Bypass permissions shown |
 | `tengu_disable_bypass_permissions_mode` | Disable bypass permissions mode |
@@ -360,104 +432,32 @@ Permission prompts, bypass modes, and trust dialogs.
 | `tengu_trust_dialog_accept` | Trust dialog accept |
 | `tengu_trust_dialog_shown` | Trust dialog shown |
 
-## Configuration
-
-Settings changes, parsing, and locking.
+### Subscription & Penguin Mode (8) — NEW
 
 | Flag | Purpose |
 |------|---------|
-| `tengu_auto_compact_setting_changed` | Auto-compact setting changed |
-| `tengu_auto_connect_ide_changed` | Auto-connect IDE changed |
-| `tengu_auto_install_ide_extension_changed` | Auto-install IDE extension changed |
-| `tengu_config_cache_stats` | Config cache stats |
-| `tengu_config_changed` | Config changed |
-| `tengu_config_lock_contention` | Config lock contention |
-| `tengu_config_model_changed` | Config model changed |
-| `tengu_config_parse_error` | Config parse error |
-| `tengu_config_stale_write` | Config stale write |
-| `tengu_managed_settings_loaded` | Managed settings loaded |
-| `tengu_managed_settings_security_dialog_accepted` | Managed settings accepted |
-| `tengu_managed_settings_security_dialog_rejected` | Managed settings rejected |
-| `tengu_managed_settings_security_dialog_shown` | Managed settings shown |
-| `tengu_sm_config` | Session memory config |
-| `tengu_version_config` | Version config |
+| `tengu_c4w_usage_limit_notifications_enabled` | C4W usage limit notifications |
+| `tengu_claudeai_limits_status_changed` | Claude.ai limits status changed |
+| `tengu_marble_lantern_disabled` | Marble lantern disabled event |
+| `tengu_org_penguin_mode_fetch_failed` | Org penguin mode fetch failure |
+| `tengu_penguin_mode_promo` | Penguin mode promo display |
+| `tengu_penguins_enabled` | Penguins feature enabled |
+| `tengu_penguins_off` | Penguins feature off |
+| `tengu_switch_to_subscription_notice_shown` | Switch to subscription notice |
 
-## CLI Input/Output
-
-User input modes, display styles, and output formatting.
+### Streaming (8)
 
 | Flag | Purpose |
 |------|---------|
-| `tengu_input_background` | Input background mode |
-| `tengu_input_bash` | Input bash mode |
-| `tengu_input_command` | Input command mode |
-| `tengu_input_prompt` | Input prompt mode |
-| `tengu_input_slash_invalid` | Invalid slash command |
-| `tengu_input_slash_missing` | Missing slash command |
-| `tengu_output_style_changed` | Output style changed |
-| `tengu_output_style_command_inline` | Output style inline command |
-| `tengu_output_style_command_inline_help` | Output style inline help |
-| `tengu_output_style_command_menu` | Output style menu |
-| `tengu_context_size` | Context size event |
-| `tengu_context_window_exceeded` | Context window exceeded |
-| `tengu_empty_model_response` | Empty model response |
-| `tengu_paste_image` | Image paste |
-| `tengu_paste_text` | Text paste |
-| `tengu_pasted_image_resize_attempt` | Pasted image resize |
-| `tengu_single_word_prompt` | Single word prompt |
+| `tengu_stream_no_events` | Stream no events |
+| `tengu_streaming_error` | Streaming error |
+| `tengu_streaming_fallback_to_non_streaming` | Streaming fallback |
+| `tengu_streaming_stall` | Streaming stall |
+| `tengu_streaming_stall_summary` | Streaming stall summary |
+| `tengu_streaming_tool_execution_not_used` | Streaming tool exec not used |
+| `tengu_streaming_tool_execution_used` | Streaming tool exec used |
 
-## Onboarding & Setup
-
-First-run setup, GitHub Actions, and installation.
-
-| Flag | Purpose |
-|------|---------|
-| `tengu_began_setup` | Setup began |
-| `tengu_claude_install_command` | Claude install command |
-| `tengu_onboarding_step` | Onboarding step |
-| `tengu_setup_github_actions_completed` | GitHub Actions setup completed |
-| `tengu_setup_github_actions_failed` | GitHub Actions setup failed |
-| `tengu_setup_github_actions_started` | GitHub Actions setup started |
-| `tengu_setup_token_command` | Setup token command |
-| `tengu_install_github_app_completed` | GitHub App install completed |
-| `tengu_install_github_app_error` | GitHub App install error |
-| `tengu_install_github_app_started` | GitHub App install started |
-| `tengu_install_github_app_step_completed` | GitHub App install step completed |
-| `tengu_install_slack_app_clicked` | Slack app install clicked |
-
-## Plugins & Skills
-
-Plugin management, skill loading, and dynamic features.
-
-| Flag | Purpose |
-|------|---------|
-| `tengu_dynamic_skills_changed` | Dynamic skills changed |
-| `tengu_plugin_disable_command` | Plugin disable command |
-| `tengu_plugin_disabled_all_cli` | All plugins disabled via CLI |
-| `tengu_plugin_disabled_cli` | Plugin disabled via CLI |
-| `tengu_plugin_enable_command` | Plugin enable command |
-| `tengu_plugin_enabled_cli` | Plugin enabled via CLI |
-| `tengu_plugin_install_command` | Plugin install command |
-| `tengu_plugin_installed` | Plugin installed |
-| `tengu_plugin_installed_cli` | Plugin installed via CLI |
-| `tengu_plugin_list_command` | Plugin list command |
-| `tengu_plugin_uninstall_command` | Plugin uninstall command |
-| `tengu_plugin_uninstalled_cli` | Plugin uninstalled via CLI |
-| `tengu_plugin_update_command` | Plugin update command |
-| `tengu_plugin_updated_cli` | Plugin updated via CLI |
-| `tengu_skill_file_changed` | Skill file changed |
-| `tengu_skill_loaded` | Skill loaded |
-| `tengu_skill_tool_invocation` | Skill tool invocation |
-| `tengu_skill_tool_slash_prefix` | Skill tool slash prefix |
-| `tengu_marketplace_added` | Marketplace item added |
-| `tengu_marketplace_removed` | Marketplace item removed |
-| `tengu_marketplace_updated` | Marketplace item updated |
-| `tengu_marketplace_updated_all` | All marketplace items updated |
-| `tengu_official_marketplace_auto_install` | Official marketplace auto-install |
-
-## Teleport
-
-Session teleportation, branching, and cross-repo session sharing.
+### Teleport (15)
 
 | Flag | Purpose |
 |------|---------|
@@ -477,24 +477,7 @@ Session teleportation, branching, and cross-repo session sharing.
 | `tengu_teleport_resume_session` | Teleport resume session |
 | `tengu_teleport_started` | Teleport started |
 
-## Streaming
-
-Stream errors, tool execution, and stall detection.
-
-| Flag | Purpose |
-|------|---------|
-| `tengu_stream_no_events` | Stream no events |
-| `tengu_streaming_error` | Streaming error |
-| `tengu_streaming_fallback_to_non_streaming` | Streaming fallback |
-| `tengu_streaming_stall` | Streaming stall |
-| `tengu_streaming_stall_summary` | Streaming stall summary |
-| `tengu_streaming_tool_execution_not_used` | Streaming tool exec not used |
-| `tengu_streaming_tool_execution_used` | Streaming tool exec used |
-| `tengu_streaming_tool_execution2` | Streaming tool execution v2 |
-
-## Hooks
-
-Pre/post tool hooks and lifecycle events.
+### Hooks (13)
 
 | Flag | Purpose |
 |------|---------|
@@ -512,236 +495,98 @@ Pre/post tool hooks and lifecycle events.
 | `tengu_run_hook` | Run hook event |
 | `tengu_stop_hook_error` | Stop hook error |
 
-## Feedback & Surveys
-
-User feedback, acceptance, and rejection events.
+### Plugins & Skills (20)
 
 | Flag | Purpose |
 |------|---------|
-| `tengu_accept_feedback_mode_collapsed` | Accept feedback collapsed |
-| `tengu_accept_feedback_mode_entered` | Accept feedback entered |
-| `tengu_accept_submitted` | Accept submitted |
-| `tengu_reject_feedback_mode_collapsed` | Reject feedback collapsed |
-| `tengu_reject_feedback_mode_entered` | Reject feedback entered |
-| `tengu_reject_submitted` | Reject submitted |
-| `tengu_feedback_survey_config` | Feedback survey config |
-| `tengu_feedback_survey_event` | Feedback survey event |
+| `tengu_dynamic_skills_changed` | Dynamic skills changed |
+| `tengu_marketplace_added` | Marketplace item added |
+| `tengu_marketplace_removed` | Marketplace item removed |
+| `tengu_marketplace_updated` | Marketplace item updated |
+| `tengu_marketplace_updated_all` | All marketplace items updated |
+| `tengu_official_marketplace_auto_install` | Official marketplace auto-install |
+| `tengu_plugin_disable_command` | Plugin disable command |
+| `tengu_plugin_disabled_all_cli` | All plugins disabled via CLI |
+| `tengu_plugin_disabled_cli` | Plugin disabled via CLI |
+| `tengu_plugin_enable_command` | Plugin enable command |
+| `tengu_plugin_enabled_cli` | Plugin enabled via CLI |
+| `tengu_plugin_install_command` | Plugin install command |
+| `tengu_plugin_installed` | Plugin installed |
+| `tengu_plugin_installed_cli` | Plugin installed via CLI |
+| `tengu_plugin_list_command` | Plugin list command |
+| `tengu_plugin_uninstall_command` | Plugin uninstall command |
+| `tengu_plugin_uninstalled_cli` | Plugin uninstalled via CLI |
+| `tengu_plugin_update_command` | Plugin update command |
+| `tengu_plugin_updated_cli` | Plugin updated via CLI |
+| `tengu_skill_file_changed` | Skill file changed |
+| `tengu_skill_loaded` | Skill loaded |
+| `tengu_skill_tool_invocation` | Skill tool invocation |
+| `tengu_skill_tool_slash_prefix` | Skill tool slash prefix |
 
-## Miscellaneous
+### Remaining Flags
 
-Remaining flags: bash, git, cost, settings, and other events.
+Configuration, feedback, CLI, and miscellaneous telemetry. See the binary scan output
+for the complete list of all 605 flags.
 
 | Flag | Purpose |
 |------|---------|
-| `tengu_1p_event_batch_config` | 1P event batch config |
-| `tengu_ask_user_question_accepted` | Ask user question accepted |
-| `tengu_ask_user_question_finish_plan_interview` | Finish plan interview |
-| `tengu_ask_user_question_rejected` | Ask user question rejected |
-| `tengu_ask_user_question_respond_to_claude` | Respond to Claude |
-| `tengu_at_mention_agent_not_found` | At-mention agent not found |
-| `tengu_at_mention_agent_success` | At-mention agent success |
-| `tengu_at_mention_extracting_directory_success` | At-mention directory extract |
-| `tengu_at_mention_extracting_filename_error` | At-mention filename error |
-| `tengu_at_mention_extracting_filename_success` | At-mention filename success |
-| `tengu_at_mention_mcp_resource_error` | At-mention MCP resource error |
-| `tengu_at_mention_mcp_resource_success` | At-mention MCP resource success |
-| `tengu_atomic_write_error` | Atomic write error |
-| `tengu_attachment_compute_duration` | Attachment compute duration |
-| `tengu_attachment_file_too_large` | Attachment file too large |
-| `tengu_attachments` | Attachments event |
-| `tengu_bash_command_explicitly_backgrounded` | Bash command backgrounded |
-| `tengu_bash_command_timeout_backgrounded` | Bash timeout backgrounded |
-| `tengu_bash_prefix` | Bash prefix event |
-| `tengu_bash_security_check_triggered` | Bash security check |
-| `tengu_bash_tool_command_executed` | Bash tool command executed |
-| `tengu_bash_tool_haiku_file_paths_read` | Bash tool haiku file paths |
-| `tengu_bash_tool_reset_to_original_dir` | Bash tool reset to original dir |
-| `tengu_bash_tool_simple_echo` | Bash tool simple echo |
-| `tengu_bug_report_submitted` | Bug report submitted |
-| `tengu_c4w_usage_limit_notifications_enabled` | C4W usage limit notifications |
-| `tengu_cancel` | Cancel event |
-| `tengu_claude_md_external_includes_dialog_accepted` | CLAUDE.md external includes accepted |
-| `tengu_claude_md_external_includes_dialog_declined` | CLAUDE.md external includes declined |
-| `tengu_claude_md_includes_dialog_shown` | CLAUDE.md includes dialog shown |
-| `tengu_claude_md_permission_error` | CLAUDE.md permission error |
-| `tengu_claude_rules_md_permission_error` | Claude rules permission error |
-| `tengu_claudeai_limits_status_changed` | Claude.ai limits status changed |
-| `tengu_claudeai_mcp_auth_completed` | Claude.ai MCP auth completed |
-| `tengu_claudeai_mcp_auth_started` | Claude.ai MCP auth started |
-| `tengu_claudeai_mcp_clear_auth_completed` | Claude.ai MCP clear auth completed |
-| `tengu_claudeai_mcp_clear_auth_started` | Claude.ai MCP clear auth started |
-| `tengu_claudeai_mcp_connectors` | Claude.ai MCP connectors |
-| `tengu_claudeai_mcp_eligibility` | Claude.ai MCP eligibility |
-| `tengu_claudeai_mcp_reconnect` | Claude.ai MCP reconnect |
-| `tengu_claudeai_mcp_toggle` | Claude.ai MCP toggle |
-| `tengu_code_change_view_opened` | Code change view opened |
-| `tengu_code_diff_cli` | Code diff CLI |
-| `tengu_code_diff_footer_setting_changed` | Code diff footer setting changed |
-| `tengu_code_indexing_tool_used` | Code indexing tool used |
-| `tengu_code_prompt_ignored` | Code prompt ignored |
-| `tengu_concurrent_onquery_detected` | Concurrent onQuery detected |
-| `tengu_concurrent_onquery_enqueued` | Concurrent onQuery enqueued |
-| `tengu_continue` | Continue event |
-| `tengu_continue_print` | Continue print |
-| `tengu_conversation_forked` | Conversation forked |
-| `tengu_cost_threshold_acknowledged` | Cost threshold acknowledged |
-| `tengu_cost_threshold_reached` | Cost threshold reached |
-| `tengu_custom_keybindings_loaded` | Custom keybindings loaded |
-| `tengu_diff_tool_changed` | Diff tool changed |
-| `tengu_dir_search` | Directory search |
-| `tengu_doctor_command` | Doctor command |
-| `tengu_editor_mode_changed` | Editor mode changed |
-| `tengu_event_sampling_config` | Event sampling config |
-| `tengu_exit` | Exit event |
-| `tengu_filtered_orphaned_thinking_message` | Filtered orphaned thinking |
-| `tengu_filtered_trailing_thinking_block` | Filtered trailing thinking |
-| `tengu_fixed_empty_assistant_content` | Fixed empty assistant content |
-| `tengu_git_index_lock_error` | Git index lock error |
-| `tengu_git_operation` | Git operation |
-| `tengu_grove_policy_dismissed` | Grove policy dismissed |
-| `tengu_grove_policy_escaped` | Grove policy escaped |
-| `tengu_grove_policy_exited` | Grove policy exited |
-| `tengu_grove_policy_submitted` | Grove policy submitted |
-| `tengu_grove_policy_toggled` | Grove policy toggled |
-| `tengu_grove_policy_viewed` | Grove policy viewed |
-| `tengu_grove_print_viewed` | Grove print viewed |
-| `tengu_grove_privacy_settings_viewed` | Grove privacy settings viewed |
-| `tengu_guest_passes_link_copied` | Guest passes link copied |
-| `tengu_guest_passes_upsell_shown` | Guest passes upsell shown |
-| `tengu_guest_passes_visited` | Guest passes visited |
-| `tengu_help_toggled` | Help toggled |
-| `tengu_image_api_validation_failed` | Image API validation failed |
-| `tengu_image_compress_failed` | Image compress failed |
-| `tengu_image_resize_failed` | Image resize failed |
-| `tengu_image_resize_fallback` | Image resize fallback |
-| `tengu_init` | Init event |
-| `tengu_keybinding_customization_release` | Keybinding customization release |
-| `tengu_keybinding_fallback_used` | Keybinding fallback used |
-| `tengu_language_changed` | Language changed |
-| `tengu_log_datadog_events` | Log Datadog events |
-| `tengu_log_segment_events` | Log Segment events |
-| `tengu_message_selector_cancelled` | Message selector cancelled |
-| `tengu_message_selector_opened` | Message selector opened |
-| `tengu_message_selector_restore_option_selected` | Message restore option |
-| `tengu_message_selector_selected` | Message selector selected |
-| `tengu_migrate_autoupdates_error` | Migrate auto-updates error |
-| `tengu_migrate_autoupdates_to_settings` | Migrate auto-updates to settings |
-| `tengu_migrate_ignore_patterns_config_cleanup_error` | Migrate ignore patterns cleanup error |
-| `tengu_migrate_ignore_patterns_error` | Migrate ignore patterns error |
-| `tengu_migrate_ignore_patterns_success` | Migrate ignore patterns success |
-| `tengu_migrate_mcp_approval_fields_error` | Migrate MCP approval error |
-| `tengu_migrate_mcp_approval_fields_success` | Migrate MCP approval success |
-| `tengu_mode_cycle` | Mode cycle |
-| `tengu_model_command_inline` | Model command inline |
-| `tengu_model_command_inline_help` | Model command inline help |
-| `tengu_model_command_menu` | Model command menu |
-| `tengu_model_command_menu_effort` | Model command menu effort |
-| `tengu_model_picker_hotkey` | Model picker hotkey |
-| `tengu_node_warning` | Node warning |
-| `tengu_notification_method_used` | Notification method used |
-| `tengu_off_switch_query` | Off switch query |
-| `tengu_opus_45_notice_shown` | Opus 4.5 notice shown |
-| `tengu_opus45_upgrade_nudge_shown` | Opus 4.5 upgrade nudge shown |
-| `tengu_orphaned_messages_tombstoned` | Orphaned messages tombstoned |
-| `tengu_pdf_page_extraction` | PDF page extraction |
-| `tengu_pid_based_version_locking` | PID-based version locking |
-| `tengu_plan_enter` | Plan mode enter |
-| `tengu_plan_exit` | Plan mode exit |
-| `tengu_plan_external_editor_used` | Plan external editor used |
-| `tengu_plan_mode_interview_phase` | Plan mode interview phase |
-| `tengu_plan_remote_eligibility_failed` | Plan remote eligibility failed |
-| `tengu_plan_remote_git_dialog` | Plan remote git dialog |
-| `tengu_plan_remote_session_failed` | Plan remote session failed |
-| `tengu_pr_status_cli` | PR status CLI |
-| `tengu_pr_status_footer_setting_changed` | PR status footer setting changed |
-| `tengu_preflight_check_failed` | Preflight check failed |
-| `tengu_prompt_suggestion` | Prompt suggestion |
-| `tengu_prompt_suggestion_init` | Prompt suggestion init |
-| `tengu_query_after_attachments` | Query after attachments |
-| `tengu_query_before_attachments` | Query before attachments |
-| `tengu_query_error` | Query error |
-| `tengu_react_vulnerability_notice_shown` | React vulnerability notice |
-| `tengu_react_vulnerability_warning` | React vulnerability warning |
-| `tengu_respect_gitignore_setting_changed` | Respect gitignore changed |
-| `tengu_resume_print` | Resume print |
-| `tengu_ripgrep_availability` | Ripgrep availability |
-| `tengu_ripgrep_eagain_retry` | Ripgrep EAGAIN retry |
-| `tengu_scratch` | Scratch/working memory |
-| `tengu_settings_sync_download_empty` | Settings sync empty |
-| `tengu_settings_sync_download_error` | Settings sync error |
-| `tengu_settings_sync_download_fetch_failed` | Settings sync fetch failed |
-| `tengu_settings_sync_download_skipped` | Settings sync skipped |
-| `tengu_settings_sync_download_success` | Settings sync success |
-| `tengu_shell_completion_failed` | Shell completion failed |
-| `tengu_shell_set_cwd` | Shell set CWD |
-| `tengu_shell_snapshot_error` | Shell snapshot error |
-| `tengu_shell_snapshot_failed` | Shell snapshot failed |
-| `tengu_shell_unknown_error` | Shell unknown error |
-| `tengu_slash_command_forked` | Slash command forked |
+| `tengu_auto_compact_setting_changed` | Auto-compact setting changed |
+| `tengu_auto_connect_ide_changed` | Auto-connect IDE changed |
+| `tengu_auto_install_ide_extension_changed` | Auto-install IDE extension changed |
+| `tengu_chain_parent_cycle` | Agent chain parent cycle detection |
+| `tengu_config_cache_stats` | Config cache stats |
+| `tengu_config_changed` | Config changed |
+| `tengu_config_lock_contention` | Config lock contention |
+| `tengu_config_model_changed` | Config model changed |
+| `tengu_config_parse_error` | Config parse error |
+| `tengu_config_stale_write` | Config stale write |
+| `tengu_headless_latency` | Headless mode latency tracking |
+| `tengu_model_response_keyword_detected` | Response keyword detection |
+| `tengu_model_whitespace_response` | Model whitespace-only response |
+| `tengu_opus_46_notice_shown` | Opus 4.6 notice shown |
+| `tengu_opus46_feed_shown` | Opus 4.6 feed shown |
+| `tengu_opus46_upgrade_nudge_shown` | Opus 4.6 upgrade nudge |
+| `tengu_reduce_motion_setting_changed` | Reduce motion accessibility setting |
 | `tengu_sonnet_1m_notice_shown` | Sonnet 1M notice shown |
-| `tengu_startup_manual_model_config` | Startup manual model config |
-| `tengu_startup_perf` | Startup performance |
-| `tengu_startup_telemetry` | Startup telemetry |
-| `tengu_status_line_mount` | Status line mount |
-| `tengu_stdin_interactive` | STDIN interactive |
-| `tengu_structured_output_enabled` | Structured output enabled |
-| `tengu_structured_output_failure` | Structured output failure |
-| `tengu_switch_to_subscription_notice_shown` | Switch to subscription notice |
-| `tengu_sysprompt_block` | System prompt block |
-| `tengu_sysprompt_boundary_found` | System prompt boundary found |
-| `tengu_sysprompt_missing_boundary_marker` | Missing boundary marker |
-| `tengu_sysprompt_no_stable_tool_for_cache` | No stable tool for cache |
-| `tengu_sysprompt_using_tool_based_cache` | Using tool-based cache |
-| `tengu_system_prompt_global_cache` | System prompt global cache |
-| `tengu_tag_command_add` | Tag command add |
-| `tengu_tag_command_remove_cancelled` | Tag command remove cancelled |
-| `tengu_tag_command_remove_confirmed` | Tag command remove confirmed |
-| `tengu_tag_command_remove_prompt` | Tag command remove prompt |
-| `tengu_terminal_progress_bar_setting_changed` | Terminal progress bar changed |
-| `tengu_thinkback` | Thinkback feature |
-| `tengu_thinking` | Thinking event |
-| `tengu_thinking_toggled` | Thinking toggled |
-| `tengu_thinking_toggled_hotkey` | Thinking toggled via hotkey |
-| `tengu_timer` | Timer event |
-| `tengu_tip_shown` | Tip shown |
-| `tengu_tips_setting_changed` | Tips setting changed |
-| `tengu_toggle_todos` | Toggle todos |
-| `tengu_toggle_transcript` | Toggle transcript |
-| `tengu_transcript_accessed` | Transcript accessed |
-| `tengu_transcript_exit` | Transcript exit |
-| `tengu_transcript_input_to_teammate` | Transcript input to teammate |
-| `tengu_transcript_toggle_show_all` | Transcript toggle show all |
-| `tengu_transcript_view_enter` | Transcript view enter |
-| `tengu_transcript_view_exit` | Transcript view exit |
-| `tengu_tree_sitter_load` | Tree-sitter load |
-| `tengu_unary_event` | Unary event |
-| `tengu_uncaught_exception` | Uncaught exception |
-| `tengu_unhandled_rejection` | Unhandled rejection |
-| `tengu_unknown_model_cost` | Unknown model cost |
-| `tengu_update_check` | Update check |
-| `tengu_version_check_failure` | Version check failure |
-| `tengu_version_check_success` | Version check success |
-| `tengu_version_lock_acquired` | Version lock acquired |
-| `tengu_version_lock_failed` | Version lock failed |
-| `tengu_worktree_detection` | Worktree detection |
-| `tengu_write_claudemd` | Write CLAUDE.md |
+| `tengu_tst_names_in_messages` | Test names in messages |
+| `tengu_transcript_parent_cycle` | Transcript parent cycle |
+| `tengu_watched_file_compression_failed` | Watched file compression failed |
+| `tengu_watched_file_stat_error` | Watched file stat error |
 
 ---
+
+## Flag Occurrence Analysis
+
+Flags with high occurrence counts (many references in the binary) are typically telemetry
+events logged from multiple code paths. Flags with low counts (1-3) are more likely to be
+feature gates checked in a single location.
+
+| Occurrences | Flag | Likely Type |
+|-------------|------|-------------|
+| 63 | `tengu_bash_security_check_triggered` | Telemetry (hot path) |
+| 33 | `tengu_install_github_app_step_completed` | Telemetry |
+| 23 | `tengu_plan_exit` | Telemetry |
+| 18 | `tengu_marble_kite` | Gate (high for gate — active A/B test?) |
+| 12 | `tengu_system_prompt_global_cache` | Gate (multi-reference) |
+| 9 | `tengu_tst_kx7` | Gate/experiment |
+| 6 | `tengu_session_memory` | Gate |
+| 3 | `tengu_amber_flint` | Gate (typical) |
+| 3 | `tengu_oboe` | Gate (typical) |
 
 ## Discovering New Flags
 
 ```bash
-# Compare current binary against baseline
-./scripts/flag-monitor.sh
+# Scan binary for all tengu_* flags
+strings "$(which claude)" | grep -oE "tengu_[a-z0-9_]+" | sort -u
 
-# Update baseline after Claude Code update
-./scripts/flag-monitor.sh --update
-
-# Scan via patcher CLI (portable, no `strings` needed)
+# Compare against baseline
 claude-patcher gates scan
+
+# Count occurrences (high = telemetry, low = gate)
+strings "$(which claude)" | grep -oE "tengu_[a-z0-9_]+" | sort | uniq -c | sort -rn
 ```
 
 ## See Also
 
 - [FEATURE-GATES.md](FEATURE-GATES.md) — Patchable feature gates reference
-- [NATIVE-INTEGRATION.md](../claude-fleet/docs/NATIVE-INTEGRATION.md) — Native multi-agent integration
+- [ENV-VARS.md](ENV-VARS.md) — Complete environment variable reference

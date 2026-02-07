@@ -29,6 +29,11 @@ vi.mock('fs', async () => {
   };
 });
 
+// Mock child_process to prevent real codesign calls during tests
+vi.mock('child_process', () => ({
+  execSync: vi.fn(),
+}));
+
 /**
  * Mock existsSync to simulate a native binary install:
  * adjacent .js/.mjs files don't exist, only the binary itself does.
