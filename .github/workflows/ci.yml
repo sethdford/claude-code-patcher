@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm run lint
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Audit dependencies
+        run: npm audit --production || true
+
+      - name: Check for secrets in source
+        run: |
+          echo "Scanning for potential secrets..."
+          FOUND=0
+          # AWS keys
+          if grep -rn "AKIA[0-9A-Z]\{16\}" src/ --include="*.ts"; then
+            echo "::error::AWS access key found in source"
+            FOUND=1
+          fi
+          # Generic secrets
+          if grep -rn "api[_-]\?key\s*[:=]\s*['\"][^'\"]\{8,\}" src/ --include="*.ts" -i; then
+            echo "::warning::Possible API key in source"
+          fi
+          if [ "$FOUND" -ne 0 ]; then
+            exit 1
+          fi
+          echo "No secrets detected."
+
+      - name: Count any types
+        run: |
+          ANY_COUNT=$(grep -rn ": any\b\|as any\b" src/ --include="*.ts" | grep -v "// eslint-disable" | wc -l || echo "0")
+          echo "Explicit 'any' type count: $ANY_COUNT"
+          if [ "$ANY_COUNT" -gt 0 ]; then
+            echo "::warning::Found $ANY_COUNT explicit 'any' types — consider using 'unknown' instead"
+            grep -rn ": any\b\|as any\b" src/ --include="*.ts" | grep -v "// eslint-disable" || true
+          fi
+
+  review:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check PR size
+        run: |
+          ADDITIONS=$(git diff --stat origin/${{ github.base_ref }}...HEAD | tail -1 | awk '{print $4}' || echo "0")
+          DELETIONS=$(git diff --stat origin/${{ github.base_ref }}...HEAD | tail -1 | awk '{print $6}' || echo "0")
+          TOTAL=$((ADDITIONS + DELETIONS))
+          echo "PR size: +$ADDITIONS -$DELETIONS ($TOTAL total)"
+          if [ "$TOTAL" -gt 1000 ]; then
+            echo "::warning::Large PR ($TOTAL lines changed) — consider splitting"
+          fi
+
+      - name: Check file sizes
+        run: |
+          LARGE_FILES=$(find src/ -name "*.ts" -exec wc -l {} + | sort -rn | awk '$1 > 500 {print}' | head -10)
+          if [ -n "$LARGE_FILES" ]; then
+            echo "::warning::Files exceeding 500-line limit:"
+            echo "$LARGE_FILES"
+          fi

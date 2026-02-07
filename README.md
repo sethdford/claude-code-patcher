@@ -6,6 +6,7 @@
 [![license](https://img.shields.io/npm/l/claude-code-patcher)](LICENSE)
 [![node](https://img.shields.io/node/v/claude-code-patcher)](package.json)
 [![zero deps](https://img.shields.io/badge/dependencies-0-brightgreen)]()
+[![website](https://img.shields.io/badge/website-live-da7756)](https://sethford.github.io/claude-code-patcher/)
 
 ## What is this?
 

@@ -1,0 +1,91 @@
+name: Security Scan
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Monday 6am UTC
+  workflow_dispatch:
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Full dependency audit
+        run: |
+          echo "=== Dependency Audit ==="
+          npm audit --json > audit-results.json || true
+          CRITICAL=$(cat audit-results.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('metadata',{}).get('vulnerabilities',{}).get('critical',0))" 2>/dev/null || echo "0")
+          HIGH=$(cat audit-results.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('metadata',{}).get('vulnerabilities',{}).get('high',0))" 2>/dev/null || echo "0")
+          echo "Critical: $CRITICAL, High: $HIGH"
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "::error::$CRITICAL critical vulnerabilities found"
+          fi
+          if [ "$HIGH" -gt 0 ]; then
+            echo "::warning::$HIGH high vulnerabilities found"
+          fi
+          npm audit || true
+
+      - name: License compliance check
+        run: |
+          echo "=== License Check ==="
+          # Check that devDependencies use permissive licenses
+          npx license-checker --production --failOn "GPL-3.0;AGPL-3.0" 2>/dev/null || {
+            echo "Note: license-checker not available — using manual check"
+            echo "This project has zero runtime dependencies (good)."
+            echo "Dev dependencies should use MIT/ISC/Apache-2.0 licenses."
+          }
+
+      - name: Type safety report
+        run: |
+          echo "=== Type Safety Report ==="
+          # Count any types
+          ANY_COUNT=$(grep -rn ": any\b\|as any\b" src/ --include="*.ts" | grep -v "// eslint-disable" | wc -l || echo "0")
+          UNKNOWN_COUNT=$(grep -rn ": unknown\b" src/ --include="*.ts" | wc -l || echo "0")
+          TOTAL_LINES=$(find src/ -name "*.ts" -exec cat {} + | wc -l)
+
+          echo "Total TypeScript lines: $TOTAL_LINES"
+          echo "Explicit 'any' types: $ANY_COUNT"
+          echo "Proper 'unknown' types: $UNKNOWN_COUNT"
+
+          if [ "$ANY_COUNT" -gt 0 ]; then
+            echo ""
+            echo "Files with 'any' types:"
+            grep -rn ": any\b\|as any\b" src/ --include="*.ts" | grep -v "// eslint-disable" || true
+          fi
+
+      - name: Source secret scan
+        run: |
+          echo "=== Secret Scan ==="
+          ISSUES=0
+
+          # AWS keys
+          if grep -rn "AKIA[0-9A-Z]\{16\}" src/ --include="*.ts" 2>/dev/null; then
+            echo "::error::AWS access key pattern found"
+            ISSUES=$((ISSUES + 1))
+          fi
+
+          # Private keys
+          if grep -rn "BEGIN.*PRIVATE KEY" src/ --include="*.ts" 2>/dev/null; then
+            echo "::error::Private key found in source"
+            ISSUES=$((ISSUES + 1))
+          fi
+
+          # GitHub tokens
+          if grep -rn "gh[pousr]_[A-Za-z0-9]\{36,\}" src/ --include="*.ts" 2>/dev/null; then
+            echo "::error::GitHub token pattern found"
+            ISSUES=$((ISSUES + 1))
+          fi
+
+          if [ "$ISSUES" -eq 0 ]; then
+            echo "No secrets detected in source code."
+          else
+            echo "::error::$ISSUES secret patterns found — review immediately"
+            exit 1
+          fi

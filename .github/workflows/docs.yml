@@ -1,0 +1,61 @@
+name: Documentation Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+
+jobs:
+  doc-freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if docs updated with source changes
+        run: |
+          # Get changed source files
+          CHANGED_SRC=$(git diff --name-only HEAD~1..HEAD -- src/ | head -20)
+
+          if [ -z "$CHANGED_SRC" ]; then
+            echo "No source changes detected."
+            exit 0
+          fi
+
+          echo "Changed source files:"
+          echo "$CHANGED_SRC"
+          echo ""
+
+          # Check if docs were also updated
+          CHANGED_DOCS=$(git diff --name-only HEAD~1..HEAD -- "*.md" | head -20)
+
+          if [ -z "$CHANGED_DOCS" ]; then
+            echo "::warning::Source files changed but no documentation updated"
+            echo "Consider updating README.md if public API changed."
+          else
+            echo "Documentation also updated:"
+            echo "$CHANGED_DOCS"
+          fi
+
+      - name: Verify README CLI section
+        run: |
+          if [ ! -f "README.md" ]; then
+            echo "No README.md found — skipping CLI verification."
+            exit 0
+          fi
+
+          # Check that README mentions key CLI commands
+          MISSING=""
+          for CMD in patch unpatch status list find exec; do
+            if ! grep -q "$CMD" README.md; then
+              MISSING="$MISSING $CMD"
+            fi
+          done
+
+          if [ -n "$MISSING" ]; then
+            echo "::warning::README.md missing CLI commands:$MISSING"
+          else
+            echo "All CLI commands documented in README.md."
+          fi

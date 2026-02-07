@@ -33,3 +33,7 @@ coverage/
 
 # Activity logs
 logs/
+
+# Nested git repos (separate projects)
+autonomy/
+claude-fleet/

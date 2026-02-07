@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Code Patcher — Feature Gate Discovery & Patching</title>
+  <meta name="description" content="Discover, analyze, and patch 29+ feature gates hidden inside Claude Code. Zero runtime dependencies.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ── Reset & Base ──────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'IBM Plex Sans', sans-serif;
+      background: #1a1a2e;
+      color: #F4F3EE;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+    a { color: #da7756; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── CRT Effects ──────────────────────────────────────────────── */
+    .crt-scanlines {
+      position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0,0,0,0.08) 0px,
+        rgba(0,0,0,0.08) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+      animation: scanline-scroll 8s linear infinite;
+    }
+    @keyframes scanline-scroll {
+      from { transform: translateY(0); }
+      to   { transform: translateY(3px); }
+    }
+    @keyframes screen-flicker {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.97; }
+    }
+    .crt-flicker { animation: screen-flicker 0.1s infinite; }
+    .phosphor-glow {
+      text-shadow: 0 0 10px rgba(218,119,86,0.4), 0 0 20px rgba(218,119,86,0.15);
+    }
+
+    /* ── Layout ───────────────────────────────────────────────────── */
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 1.5rem; }
+    section { padding: 5rem 0; }
+    .section-title {
+      font-family: 'Courier Prime', monospace;
+      font-size: 2rem;
+      color: #da7756;
+      margin-bottom: 0.5rem;
+    }
+    .section-subtitle {
+      color: #9a9a9a;
+      font-size: 1rem;
+      margin-bottom: 3rem;
+    }
+
+    /* ── Hero / Boot Sequence ─────────────────────────────────────── */
+    #hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .monitor {
+      background: #111122;
+      border: 8px solid #2a2a3e;
+      border-top-color: #3a3a4e;
+      border-left-color: #3a3a4e;
+      border-bottom-color: #1a1a28;
+      border-right-color: #1a1a28;
+      border-radius: 12px;
+      box-shadow:
+        inset 0 0 60px rgba(0,0,0,0.5),
+        0 0 40px rgba(218,119,86,0.08),
+        0 8px 32px rgba(0,0,0,0.6);
+      padding: 2.5rem 3rem;
+      max-width: 720px;
+      width: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+    .monitor::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center, rgba(218,119,86,0.03) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .boot-line {
+      font-family: 'Courier Prime', monospace;
+      font-size: 0.95rem;
+      line-height: 1.8;
+      color: #F4F3EE;
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 0.3s, transform 0.3s;
+    }
+    .boot-line.visible { opacity: 1; transform: translateY(0); }
+    .boot-line .ok { color: #22c55e; }
+    .boot-line .warn { color: #f97316; }
+    .boot-line .highlight { color: #da7756; }
+    .cursor {
+      display: inline-block;
+      width: 10px; height: 1.1em;
+      background: #da7756;
+      vertical-align: text-bottom;
+      animation: cursor-blink 1s step-end infinite;
+    }
+    @keyframes cursor-blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+    .hero-tagline {
+      text-align: center;
+      margin-top: 2rem;
+      opacity: 0;
+      transition: opacity 0.8s ease 0.5s;
+    }
+    .hero-tagline.visible { opacity: 1; }
+    .hero-tagline h1 {
+      font-family: 'Courier Prime', monospace;
+      font-size: 1.3rem;
+      color: #da7756;
+      font-weight: 700;
+    }
+    .hero-tagline p {
+      color: #9a9a9a;
+      font-size: 0.9rem;
+      margin-top: 0.4rem;
+    }
+
+    /* ── Key Stats ────────────────────────────────────────────────── */
+    #stats { background: #16162a; }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 1.5rem;
+    }
+    .stat-card {
+      background: #1a1a2e;
+      border: 1px solid #2a2a3e;
+      border-radius: 8px;
+      padding: 1.5rem 1rem;
+      text-align: center;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .stat-card:hover {
+      border-color: #da7756;
+      box-shadow: 0 0 20px rgba(218,119,86,0.1);
+    }
+    .stat-number {
+      font-family: 'Courier Prime', monospace;
+      font-size: 2.8rem;
+      font-weight: 700;
+      color: #da7756;
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 0.85rem;
+      color: #9a9a9a;
+      margin-top: 0.5rem;
+    }
+
+    /* ── Discovery Timeline ───────────────────────────────────────── */
+    .timeline { position: relative; padding-left: 2rem; }
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 7px;
+      top: 0; bottom: 0;
+      width: 2px;
+      background: linear-gradient(to bottom, #da7756 0%, #3a3a4e 100%);
+    }
+    .timeline-item {
+      position: relative;
+      margin-bottom: 3rem;
+      padding-left: 1.5rem;
+      opacity: 0;
+      transform: translateX(-20px);
+      transition: opacity 0.5s, transform 0.5s;
+    }
+    .timeline-item.visible { opacity: 1; transform: translateX(0); }
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -2rem;
+      top: 0.35rem;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: #da7756;
+      box-shadow: 0 0 12px rgba(218,119,86,0.5);
+      border: 2px solid #1a1a2e;
+    }
+    .timeline-phase {
+      font-family: 'Courier Prime', monospace;
+      font-size: 0.8rem;
+      color: #da7756;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .timeline-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin: 0.25rem 0 0.5rem;
+    }
+    .timeline-desc { color: #9a9a9a; font-size: 0.95rem; }
+
+    /* ── Gate Explorer ────────────────────────────────────────────── */
+    #explorer { background: #16162a; }
+    .search-bar {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .search-input {
+      flex: 1;
+      min-width: 240px;
+      background: #1a1a2e;
+      border: 1px solid #2a2a3e;
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      color: #F4F3EE;
+      font-family: 'Courier Prime', monospace;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-input::placeholder { color: #555; }
+    .search-input:focus { border-color: #da7756; }
+    .filter-chips {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+    }
+    .chip {
+      background: #1a1a2e;
+      border: 1px solid #2a2a3e;
+      border-radius: 20px;
+      padding: 0.4rem 0.9rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+      user-select: none;
+      color: #9a9a9a;
+    }
+    .chip:hover { border-color: #da7756; color: #F4F3EE; }
+    .chip.active { background: #da7756; border-color: #da7756; color: #111; font-weight: 600; }
+
+    .gates-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1.25rem;
+    }
+    .gate-card {
+      background: #1a1a2e;
+      border: 1px solid #2a2a3e;
+      border-radius: 8px;
+      padding: 1.25rem;
+      transition: border-color 0.3s, box-shadow 0.3s;
+      contain: layout style paint;
+    }
+    .gate-card:hover {
+      border-color: #da7756;
+      box-shadow: 0 0 16px rgba(218,119,86,0.1);
+    }
+    .gate-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .gate-codename {
+      font-family: 'Courier Prime', monospace;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #F4F3EE;
+    }
+    .gate-badges { display: flex; gap: 0.4rem; flex-shrink: 0; }
+    .badge {
+      font-size: 0.65rem;
+      font-weight: 600;
+      padding: 0.15rem 0.5rem;
+      border-radius: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .badge-t1 { background: rgba(34,197,94,0.15); color: #22c55e; }
+    .badge-t2 { background: rgba(59,130,246,0.15); color: #3b82f6; }
+    .badge-t3 { background: rgba(168,85,247,0.15); color: #a855f7; }
+    .badge-t4 { background: rgba(249,115,22,0.15); color: #f97316; }
+    .badge-t5 { background: rgba(239,68,68,0.15); color: #ef4444; }
+    .badge-patchable { background: rgba(34,197,94,0.15); color: #22c55e; }
+    .badge-detect { background: rgba(156,156,156,0.15); color: #9a9a9a; }
+    .gate-flag {
+      font-family: 'Courier Prime', monospace;
+      font-size: 0.78rem;
+      color: #6a6a8a;
+      margin-bottom: 0.5rem;
+      word-break: break-all;
+    }
+    .gate-desc {
+      font-size: 0.88rem;
+      color: #b0b0b0;
+      line-height: 1.5;
+      margin-bottom: 0.5rem;
+    }
+    .gate-env {
+      font-family: 'Courier Prime', monospace;
+      font-size: 0.75rem;
+      color: #3b82f6;
+      background: rgba(59,130,246,0.08);
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      display: inline-block;
+    }
+    .no-results {
+      text-align: center;
+      padding: 3rem;
+      color: #555;
+      font-family: 'Courier Prime', monospace;
+    }
+
+    /* ── Flag Universe ────────────────────────────────────────────── */
+    .category-bars { max-width: 700px; }
+    .category-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 0.75rem;
+      gap: 1rem;
+    }
+    .category-label {
+      font-family: 'Courier Prime', monospace;
+      font-size: 0.82rem;
+      color: #9a9a9a;
+      min-width: 100px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .category-bar-track {
+      flex: 1;
+      background: #2a2a3e;
+      border-radius: 4px;
+      height: 22px;
+      overflow: hidden;
+      position: relative;
+    }
+    .category-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      background: linear-gradient(90deg, #da7756, #e89a7c);
+      width: 0%;
+      transition: width 1s ease-out;
+    }
+    .category-count {
+      font-family: 'Courier Prime', monospace;
+      font-size: 0.82rem;
+      color: #da7756;
+      min-width: 36px;
+      flex-shrink: 0;
+    }
+
+    /* ── Get Started ──────────────────────────────────────────────── */
+    #get-started { background: #16162a; }
+    .install-block {
+      background: #1a1a2e;
+      border: 1px solid #2a2a3e;
+      border-radius: 8px;
+      padding: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      max-width: 600px;
+      margin: 0 auto 2rem;
+      flex-wrap: wrap;
+    }
+    .install-cmd {
+      font-family: 'Courier Prime', monospace;
+      font-size: 1rem;
+      color: #da7756;
+      flex: 1;
+    }
+    .install-cmd .prompt { color: #555; }
+    .copy-btn {
+      background: #da7756;
+      color: #111;
+      border: none;
+      border-radius: 6px;
+      padding: 0.5rem 1.2rem;
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    .copy-btn:hover { background: #e89a7c; }
+    .cta-links {
+      display: flex;
+      gap: 1.5rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .cta-link {
+      font-weight: 600;
+      font-size: 1rem;
+      padding: 0.6rem 1.5rem;
+      border: 1px solid #da7756;
+      border-radius: 6px;
+      transition: background 0.2s, color 0.2s;
+    }
+    .cta-link:hover {
+      background: #da7756;
+      color: #111;
+      text-decoration: none;
+    }
+
+    /* ── Footer ───────────────────────────────────────────────────── */
+    footer {
+      text-align: center;
+      padding: 3rem 1.5rem;
+      border-top: 1px solid #2a2a3e;
+      color: #555;
+      font-size: 0.85rem;
+    }
+    footer .tagline {
+      font-family: 'Courier Prime', monospace;
+      color: #9a9a9a;
+      margin-bottom: 0.5rem;
+    }
+
+    /* ── Responsive ───────────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .stats-grid { grid-template-columns: repeat(3, 1fr); }
+      .gates-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 640px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .gates-grid { grid-template-columns: 1fr; }
+      .monitor { padding: 1.5rem; }
+      .section-title { font-size: 1.5rem; }
+      .stat-number { font-size: 2rem; }
+      .category-label { min-width: 70px; font-size: 0.72rem; }
+    }
+
+    /* ── Reduced Motion ───────────────────────────────────────────── */
+    @media (prefers-reduced-motion: reduce) {
+      .crt-scanlines { animation: none; }
+      .crt-flicker { animation: none; }
+      .cursor { animation: none; opacity: 1; }
+      .boot-line { transition: none; opacity: 1; transform: none; }
+      .timeline-item { transition: none; opacity: 1; transform: none; }
+      .category-bar-fill { transition: none; }
+      .hero-tagline { transition: none; opacity: 1; }
+      html { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="crt-scanlines" aria-hidden="true"></div>
+
+  <!-- ═══ Hero / Boot Sequence ═══ -->
+  <section id="hero">
+    <div>
+      <div class="monitor crt-flicker" id="boot-screen" role="img" aria-label="Terminal boot sequence animation">
+        <div class="boot-line" data-text="CLAUDE CODE PATCHER v2.0.0"></div>
+        <div class="boot-line" data-text="────────────────────────────────────"></div>
+        <div class="boot-line" data-text="[<span class='ok'>OK</span>] Scanning Claude Code binary..."></div>
+        <div class="boot-line" data-text="[<span class='ok'>OK</span>] 605 feature flags extracted"></div>
+        <div class="boot-line" data-text="[<span class='ok'>OK</span>] 29 gates identified &amp; classified"></div>
+        <div class="boot-line" data-text="[<span class='ok'>OK</span>] 9 gates patchable (Tier 1-3)"></div>
+        <div class="boot-line" data-text="[<span class='warn'>!!</span>] 398 env vars catalogued"></div>
+        <div class="boot-line" data-text="[<span class='ok'>OK</span>] Zero runtime dependencies"></div>
+        <div class="boot-line" data-text=""></div>
+        <div class="boot-line" data-text="<span class='highlight'>Ready.</span> <span class='cursor'></span>"></div>
+      </div>
+      <div class="hero-tagline" id="hero-tagline">
+        <h1 class="phosphor-glow">Claude Code Patcher</h1>
+        <p>Feature gate discovery, analysis &amp; binary patching</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ Key Stats ═══ -->
+  <section id="stats">
+    <div class="container">
+      <h2 class="section-title phosphor-glow">// Key Stats</h2>
+      <p class="section-subtitle">Numbers from the v2.1.37 binary analysis</p>
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card">
+          <div class="stat-number phosphor-glow" data-target="605">0</div>
+          <div class="stat-label">Feature Flags</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number phosphor-glow" data-target="29">0</div>
+          <div class="stat-label">Gates Mapped</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number phosphor-glow" data-target="9">0</div>
+          <div class="stat-label">Patchable</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number phosphor-glow" data-target="398">0</div>
+          <div class="stat-label">Env Variables</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number phosphor-glow" data-target="0">0</div>
+          <div class="stat-label">Runtime Deps</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ Discovery Timeline ═══ -->
+  <section id="timeline">
+    <div class="container">
+      <h2 class="section-title phosphor-glow">// Discovery Timeline</h2>
+      <p class="section-subtitle">How we mapped Claude Code's hidden feature gates</p>
+      <div class="timeline" id="timeline-list"></div>
+    </div>
+  </section>
+
+  <!-- ═══ Interactive Gate Explorer ═══ -->
+  <section id="explorer">
+    <div class="container">
+      <h2 class="section-title phosphor-glow">// Gate Explorer</h2>
+      <p class="section-subtitle">Search, filter, and explore all 29 known feature gates</p>
+      <div class="search-bar">
+        <input type="text" class="search-input" id="gate-search" placeholder="Search gates by name, flag, or description..." aria-label="Search gates">
+      </div>
+      <div class="filter-chips" id="filter-chips" role="group" aria-label="Filter gates"></div>
+      <div class="gates-grid" id="gates-grid"></div>
+    </div>
+  </section>
+
+  <!-- ═══ Flag Universe ═══ -->
+  <section id="universe">
+    <div class="container">
+      <h2 class="section-title phosphor-glow">// Flag Universe</h2>
+      <p class="section-subtitle">605 flags across 18 categories extracted from the binary</p>
+      <div class="category-bars" id="category-bars"></div>
+    </div>
+  </section>
+
+  <!-- ═══ Get Started ═══ -->
+  <section id="get-started">
+    <div class="container" style="text-align:center;">
+      <h2 class="section-title phosphor-glow">// Get Started</h2>
+      <p class="section-subtitle">Install globally with npm — zero runtime dependencies</p>
+      <div class="install-block">
+        <div class="install-cmd"><span class="prompt">$ </span>npm install -g claude-code-patcher</div>
+        <button class="copy-btn" id="copy-btn" aria-label="Copy install command">Copy</button>
+      </div>
+      <div class="cta-links">
+        <a href="https://github.com/sethdford/claude-code-patcher" class="cta-link">GitHub</a>
+        <a href="https://github.com/sethdford/claude-code-patcher#readme" class="cta-link">Documentation</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ Footer ═══ -->
+  <footer>
+    <div class="tagline">Built with curiosity &amp; a hex editor.</div>
+    <div>MIT License &copy; 2025 Claude Code Patcher Contributors</div>
+  </footer>
+
+  <script>
+    /* ═══════════════════════════════════════════════════════════════
+       Data
+       ═══════════════════════════════════════════════════════════════ */
+
+    const GATES = [
+      { codename: 'swarm-mode', flag: 'tengu_brass_pebble', tier: 2, patchable: true, env: 'CLAUDE_CODE_AGENT_SWARMS', desc: 'Multi-agent swarm coordination (removed/ungated in v2.1.37)' },
+      { codename: 'team-mode', flag: 'tengu_brass_pebble', tier: 3, patchable: true, env: 'CLAUDE_CODE_TEAM_MODE', desc: 'Team mode \u2014 TodoWrite-adjacent task/team features' },
+      { codename: 'workout-v2', flag: 'tengu_workout2', tier: 1, patchable: true, env: null, desc: 'Workout v2 \u2014 iteration on original evaluation/training feature' },
+      { codename: 'keybinding-customization', flag: 'tengu_keybinding_customization_release', tier: 1, patchable: true, env: null, desc: 'Custom keyboard shortcut configuration' },
+      { codename: 'session-memory', flag: 'tengu_session_memory', tier: 1, patchable: true, env: null, desc: 'Persistent memory across sessions' },
+      { codename: 'oboe', flag: 'tengu_oboe', tier: 2, patchable: true, env: 'CLAUDE_CODE_DISABLE_AUTO_MEMORY', desc: 'Auto Memory \u2014 persistent ~/.claude/memory/MEMORY.md' },
+      { codename: 'amber-flint', flag: 'tengu_amber_flint', tier: 2, patchable: true, env: 'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS', desc: 'Agent Teams feature gate (env + Statsig double-check)' },
+      { codename: 'silver-lantern', flag: 'tengu_silver_lantern', tier: 3, patchable: true, env: null, desc: 'Promo mode selector \u2014 subscription-based promo routing' },
+      { codename: 'copper-lantern', flag: 'tengu_copper_lantern', tier: 3, patchable: true, env: null, desc: 'Pro/Max subscription promo banner with tier checks' },
+      { codename: 'chomp-inflection', flag: 'tengu_chomp_inflection', tier: 4, patchable: false, env: 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION', desc: 'Prompt suggestions after responses' },
+      { codename: 'vinteuil-phrase', flag: 'tengu_vinteuil_phrase', tier: 4, patchable: false, env: 'CLAUDE_CODE_SIMPLE', desc: 'Simplified/lighter system prompt variant' },
+      { codename: 'speculation', flag: 'tengu_speculation', tier: 5, patchable: false, env: null, desc: 'Speculative execution \u2014 pre-runs likely tool calls' },
+      { codename: 'structured-output', flag: 'tengu_structured_output_enabled', tier: 5, patchable: false, env: null, desc: 'Structured/typed output mode' },
+      { codename: 'streaming-tool-exec-v2', flag: 'tengu_streaming_tool_execution2', tier: 5, patchable: false, env: null, desc: 'Execute tools while model is still streaming' },
+      { codename: 'thinkback', flag: 'tengu_thinkback', tier: 5, patchable: false, env: null, desc: 'Year-in-review animation skill (/think-back)' },
+      { codename: 'system-prompt-global-cache', flag: 'tengu_system_prompt_global_cache', tier: 4, patchable: false, env: 'CLAUDE_CODE_FORCE_GLOBAL_CACHE', desc: 'Global system prompt caching for faster startup' },
+      { codename: 'marble-anvil', flag: 'tengu_marble_anvil', tier: 5, patchable: false, env: null, desc: 'Clear thinking beta (clear_thinking_20251015)' },
+      { codename: 'marble-kite', flag: 'tengu_marble_kite', tier: 5, patchable: false, env: null, desc: 'Write/Edit guardrail bypass \u2014 removes read-before-edit restriction' },
+      { codename: 'coral-fern', flag: 'tengu_coral_fern', tier: 5, patchable: false, env: null, desc: 'Past session access \u2014 system prompt for session data' },
+      { codename: 'quiet-fern', flag: 'tengu_quiet_fern', tier: 5, patchable: false, env: null, desc: 'VS Code extension experiment gate' },
+      { codename: 'plank-river-frost', flag: 'tengu_plank_river_frost', tier: 5, patchable: false, env: null, desc: 'SUGGESTION MODE prompt for next-prompt suggestions' },
+      { codename: 'quartz-lantern', flag: 'tengu_quartz_lantern', tier: 5, patchable: false, env: null, desc: 'Lantern family gate (related to silver/copper)' },
+      { codename: 'scarf-coffee', flag: 'tengu_scarf_coffee', tier: 5, patchable: false, env: null, desc: 'Conditional tool injection into tool list' },
+      { codename: 'cache-plum-violet', flag: 'tengu_cache_plum_violet', tier: 5, patchable: false, env: null, desc: 'Cache feature gate for prompt caching' },
+      { codename: 'flicker', flag: 'tengu_flicker', tier: 5, patchable: false, env: null, desc: 'TUI telemetry \u2014 tracks terminal resize flickers' },
+      { codename: 'tool-pear', flag: 'tengu_tool_pear', tier: 5, patchable: false, env: null, desc: 'Tool schema filtering (inputJSONSchema experiment)' },
+      { codename: 'cork-m4q', flag: 'tengu_cork_m4q', tier: 5, patchable: false, env: null, desc: 'Policy spec injection \u2014 <policy_spec> XML in system prompt' },
+      { codename: 'tst-kx7', flag: 'tengu_tst_kx7', tier: 5, patchable: false, env: null, desc: 'Tool search experiment with deferred tools' },
+      { codename: 'plum-vx3', flag: 'tengu_plum_vx3', tier: 5, patchable: false, env: null, desc: 'WebSearch \u2014 disables thinking, forces web_search tool' },
+      { codename: 'kv7-prompt-sort', flag: 'tengu_kv7_prompt_sort', tier: 5, patchable: false, env: null, desc: 'Prompt sorting for cache efficiency' },
+      { codename: 'workout', flag: 'tengu_workout', tier: 5, patchable: false, env: null, desc: 'Workout v1 (superseded by workout-v2)' },
+    ];
+
+    const TIMELINE_PHASES = [
+      { phase: 'Phase 1', title: 'Initial Discovery', desc: 'JS bundle analysis revealed Statsig feature gates using the tengu_* naming convention. First gates extracted from minified checkGate() calls.' },
+      { phase: 'Phase 2', title: 'Binary Deep Dive', desc: 'Native Mach-O binary scanning uncovered 572 feature flags embedded as string literals \u2014 far more than the JS bundle alone revealed.' },
+      { phase: 'Phase 3', title: 'Gate Cracking', desc: 'Reverse-engineering unknown gates by tracing code paths. Tier classification system (1\u20135) established based on patchability and wrapper complexity.' },
+      { phase: 'Phase 4', title: 'v2.1.37 Update', desc: '605 total flags (+39 new, \u22125 removed). Swarm mode fully ungated. silver-lantern gained promo-copper ternary. All 29 gates re-verified.' },
+      { phase: 'Phase 5', title: 'What\'s Next?', desc: 'Auto-detection across versions, community contributions, and expanding the patchable gate set as new patterns emerge.' },
+    ];
+
+    const FLAG_CATEGORIES = [
+      { name: 'Other', count: 312 },
+      { name: 'OAuth', count: 39 },
+      { name: 'MCP', count: 26 },
+      { name: 'Tools', count: 22 },
+      { name: 'Core System', count: 21 },
+      { name: 'Session', count: 18 },
+      { name: 'Prompt', count: 17 },
+      { name: 'Model', count: 15 },
+      { name: 'Hooks', count: 14 },
+      { name: 'Context', count: 13 },
+      { name: 'Telemetry', count: 12 },
+      { name: 'Extensions', count: 11 },
+      { name: 'Security', count: 10 },
+      { name: 'Search', count: 9 },
+      { name: 'Tasks', count: 8 },
+      { name: 'Git', count: 7 },
+      { name: 'Memory', count: 6 },
+      { name: 'UI', count: 5 },
+    ];
+
+    const isReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    /* ═══════════════════════════════════════════════════════════════
+       Boot Sequence
+       ═══════════════════════════════════════════════════════════════ */
+
+    function runBootSequence() {
+      const lines = document.querySelectorAll('#boot-screen .boot-line');
+      const tagline = document.getElementById('hero-tagline');
+
+      if (isReducedMotion) {
+        lines.forEach(function(el) {
+          el.innerHTML = el.getAttribute('data-text');
+          el.classList.add('visible');
+        });
+        tagline.classList.add('visible');
+        return;
+      }
+
+      let delay = 300;
+      lines.forEach(function(el, i) {
+        setTimeout(function() {
+          el.innerHTML = el.getAttribute('data-text');
+          el.classList.add('visible');
+        }, delay);
+        delay += 200 + Math.random() * 150;
+      });
+      setTimeout(function() { tagline.classList.add('visible'); }, delay + 400);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Scroll-Triggered Counters
+       ═══════════════════════════════════════════════════════════════ */
+
+    function animateCounters() {
+      const counters = document.querySelectorAll('.stat-number[data-target]');
+      const observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          if (!entry.isIntersecting) return;
+          const el = entry.target;
+          const target = parseInt(el.getAttribute('data-target'), 10);
+          observer.unobserve(el);
+
+          if (isReducedMotion || target === 0) {
+            el.textContent = target;
+            return;
+          }
+
+          const duration = 1200;
+          const start = performance.now();
+          function tick(now) {
+            const progress = Math.min((now - start) / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            el.textContent = Math.round(eased * target);
+            if (progress < 1) requestAnimationFrame(tick);
+          }
+          requestAnimationFrame(tick);
+        });
+      }, { threshold: 0.3 });
+      counters.forEach(function(c) { observer.observe(c); });
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Timeline
+       ═══════════════════════════════════════════════════════════════ */
+
+    function renderTimeline() {
+      const container = document.getElementById('timeline-list');
+      container.innerHTML = TIMELINE_PHASES.map(function(p) {
+        return '<div class="timeline-item">' +
+          '<div class="timeline-phase">' + p.phase + '</div>' +
+          '<div class="timeline-title">' + p.title + '</div>' +
+          '<div class="timeline-desc">' + p.desc + '</div>' +
+          '</div>';
+      }).join('');
+
+      const observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.15 });
+
+      container.querySelectorAll('.timeline-item').forEach(function(item) {
+        if (isReducedMotion) {
+          item.classList.add('visible');
+        } else {
+          observer.observe(item);
+        }
+      });
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Gate Explorer
+       ═══════════════════════════════════════════════════════════════ */
+
+    let activeFilters = new Set();
+
+    const FILTER_OPTIONS = [
+      { key: 'patchable', label: 'Patchable' },
+      { key: 'detection', label: 'Detection-Only' },
+      { key: 't1', label: 'Tier 1' },
+      { key: 't2', label: 'Tier 2' },
+      { key: 't3', label: 'Tier 3' },
+      { key: 't4', label: 'Tier 4' },
+      { key: 't5', label: 'Tier 5' },
+    ];
+
+    function renderFilterChips() {
+      const container = document.getElementById('filter-chips');
+      container.innerHTML = FILTER_OPTIONS.map(function(f) {
+        return '<button class="chip" data-filter="' + f.key + '">' + f.label + '</button>';
+      }).join('');
+      container.querySelectorAll('.chip').forEach(function(chip) {
+        chip.addEventListener('click', function() {
+          const key = this.getAttribute('data-filter');
+          if (activeFilters.has(key)) {
+            activeFilters.delete(key);
+            this.classList.remove('active');
+          } else {
+            activeFilters.add(key);
+            this.classList.add('active');
+          }
+          renderGates();
+        });
+      });
+    }
+
+    function renderGates() {
+      const query = document.getElementById('gate-search').value.toLowerCase().trim();
+      const grid = document.getElementById('gates-grid');
+
+      let filtered = GATES.filter(function(g) {
+        if (query) {
+          const haystack = (g.codename + ' ' + g.flag + ' ' + g.desc).toLowerCase();
+          if (haystack.indexOf(query) === -1) return false;
+        }
+        if (activeFilters.size === 0) return true;
+        let pass = false;
+        if (activeFilters.has('patchable') && g.patchable) pass = true;
+        if (activeFilters.has('detection') && !g.patchable) pass = true;
+        if (activeFilters.has('t' + g.tier)) pass = true;
+        return pass;
+      });
+
+      if (filtered.length === 0) {
+        grid.innerHTML = '<div class="no-results">No gates match your search.</div>';
+        return;
+      }
+
+      grid.innerHTML = filtered.map(function(g) {
+        const tierClass = 'badge-t' + g.tier;
+        const statusBadge = g.patchable
+          ? '<span class="badge badge-patchable">Patchable</span>'
+          : '<span class="badge badge-detect">Detection</span>';
+        const envHtml = g.env
+          ? '<div class="gate-env">' + g.env + '</div>'
+          : '';
+        return '<div class="gate-card">' +
+          '<div class="gate-header">' +
+            '<div class="gate-codename">' + g.codename + '</div>' +
+            '<div class="gate-badges">' +
+              '<span class="badge ' + tierClass + '">T' + g.tier + '</span>' +
+              statusBadge +
+            '</div>' +
+          '</div>' +
+          '<div class="gate-flag">' + g.flag + '</div>' +
+          '<div class="gate-desc">' + g.desc + '</div>' +
+          envHtml +
+          '</div>';
+      }).join('');
+    }
+
+    function initGateExplorer() {
+      renderFilterChips();
+      renderGates();
+
+      let debounceTimer;
+      document.getElementById('gate-search').addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(renderGates, 200);
+      });
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Flag Universe (Category Bars)
+       ═══════════════════════════════════════════════════════════════ */
+
+    function renderCategoryBars() {
+      const container = document.getElementById('category-bars');
+      const maxCount = Math.max.apply(null, FLAG_CATEGORIES.map(function(c) { return c.count; }));
+
+      container.innerHTML = FLAG_CATEGORIES.map(function(cat) {
+        const pct = (cat.count / maxCount * 100).toFixed(1);
+        return '<div class="category-row">' +
+          '<div class="category-label">' + cat.name + '</div>' +
+          '<div class="category-bar-track">' +
+            '<div class="category-bar-fill" data-width="' + pct + '%"></div>' +
+          '</div>' +
+          '<div class="category-count">' + cat.count + '</div>' +
+          '</div>';
+      }).join('');
+
+      const observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          if (!entry.isIntersecting) return;
+          entry.target.querySelectorAll('.category-bar-fill').forEach(function(bar) {
+            const w = bar.getAttribute('data-width');
+            if (isReducedMotion) {
+              bar.style.width = w;
+            } else {
+              requestAnimationFrame(function() { bar.style.width = w; });
+            }
+          });
+          observer.unobserve(entry.target);
+        });
+      }, { threshold: 0.1 });
+      observer.observe(container);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Copy to Clipboard
+       ═══════════════════════════════════════════════════════════════ */
+
+    function initCopyButton() {
+      var btn = document.getElementById('copy-btn');
+      btn.addEventListener('click', function() {
+        navigator.clipboard.writeText('npm install -g claude-code-patcher').then(function() {
+          btn.textContent = 'Copied!';
+          setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
+        });
+      });
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Init
+       ═══════════════════════════════════════════════════════════════ */
+
+    document.addEventListener('DOMContentLoaded', function() {
+      runBootSequence();
+      animateCounters();
+      renderTimeline();
+      initGateExplorer();
+      renderCategoryBars();
+      initCopyButton();
+    });
+  </script>
+</body>
+</html>
