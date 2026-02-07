@@ -1,49 +1,58 @@
 # Claude Code Patcher
 
-**Feature gate detection, analysis, and patching for Claude Code.**
+**Detect, analyze, and patch feature gates in Claude Code.**
 
-Detect, scan, and patch Statsig feature gates (`tengu_*` flags) in Claude Code's JS bundle or native binary. Supports both npm-installed JS bundles and compiled native binaries (Node.js SEA).
+[![npm version](https://img.shields.io/npm/v/claude-code-patcher)](https://www.npmjs.com/package/claude-code-patcher)
+[![license](https://img.shields.io/npm/l/claude-code-patcher)](LICENSE)
+[![node](https://img.shields.io/node/v/claude-code-patcher)](package.json)
+[![zero deps](https://img.shields.io/badge/dependencies-0-brightgreen)]()
+
+## What is this?
+
+Claude Code Patcher scans Claude Code's JS bundles and native binaries to detect, catalog, and optionally patch Statsig feature gates (`tengu_*` flags). It gives you visibility into which features are gated, what each gate controls, and the ability to force-enable gates that are still in rollout. Zero runtime dependencies, works on both npm-installed JS bundles and compiled native binaries (Node.js SEA).
+
+> **605** flags cataloged | **29** gates documented | **9** patchable | **0** runtime deps
 
 ## Quick Start
 
 ```bash
-# Install
 npm install -g claude-code-patcher
 
-# List all detected feature gates
+# Scan for all feature gates
 claude-patcher gates
 
 # Enable a specific gate
-claude-patcher gates enable swarm
+claude-patcher gates enable session-memory
 
-# Enable all patchable gates
-claude-patcher gates enable --all
-
-# Scan binary for all tengu_* flags
+# Scan for all tengu_* flags in the binary
 claude-patcher gates scan
-
-# Restore from backup
-claude-patcher gates reset
 ```
 
-## CLI Reference
+## What Can You Do?
+
+### :mag: Discover
+
+Scan Claude Code installations for registered feature gates and list all `tengu_*` flags embedded in the binary. The CLI auto-detects your installation path.
 
 ```bash
-claude-patcher gates                    # List all detected feature gates
-claude-patcher gates scan               # Scan binary for all tengu_* flags
-claude-patcher gates enable <name>      # Enable a patchable gate
-claude-patcher gates enable --all       # Enable all patchable gates
-claude-patcher gates disable <name>     # Disable a gate (restore from backup)
-claude-patcher gates reset              # Restore all gates from backup
+claude-patcher gates          # List all detected feature gates
+claude-patcher gates scan     # Scan binary for all 605+ tengu_* flags
 ```
 
-### Options
+### :wrench: Enable
+
+Force-enable gated features by patching the JS bundle or native binary. Patches are byte-length-preserving with automatic backup and macOS codesign re-signing.
 
 ```bash
---cli <path>       # Specify Claude Code CLI path (auto-detected by default)
---help, -h         # Show help
---version, -v      # Show version
+claude-patcher gates enable session-memory   # Enable a specific gate
+claude-patcher gates enable --all            # Enable all patchable gates
+claude-patcher gates disable session-memory  # Restore from backup
+claude-patcher gates reset                   # Restore all gates from backup
 ```
+
+### :books: Research
+
+Every gate has been reverse-engineered from the minified binary. The docs catalog all 605 `tengu_*` flags by category, document 114 `CLAUDE_CODE_*` environment variables, and explain what each gate controls.
 
 ## Patchable Gates
 
@@ -71,40 +80,19 @@ These gates have reverse-engineered function bodies and can be force-enabled:
 
 ## Detection-Only Gates
 
-These gates are detected in the binary but are either too complex to patch or have env var overrides:
+Detected in the binary but either too complex to patch safely or controllable via environment variables:
 
-| Codename | Flag | Notes |
-|----------|------|-------|
-| `chomp-inflection` | `tengu_chomp_inflection` | Prompt suggestions. Env: `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION` |
-| `vinteuil-phrase` | `tengu_vinteuil_phrase` | Simplified system prompt. Env: `CLAUDE_CODE_SIMPLE` |
-| `speculation` | `tengu_speculation` | Speculative execution (inline, Tier 5) |
-| `structured-output` | `tengu_structured_output_enabled` | Structured output mode (inline, Tier 5) |
-| `streaming-tool-exec-v2` | `tengu_streaming_tool_execution2` | Streaming tool execution v2 (inline, Tier 5) |
-| `thinkback` | `tengu_thinkback` | Year-in-review animation skill (inline, Tier 5) |
-| `system-prompt-global-cache` | `tengu_system_prompt_global_cache` | Global prompt cache. Env: `CLAUDE_CODE_FORCE_GLOBAL_CACHE` |
+| Codename | Description |
+|----------|-------------|
+| `chomp-inflection` | Prompt suggestions. Env: `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION` |
+| `vinteuil-phrase` | Simplified system prompt. Env: `CLAUDE_CODE_SIMPLE` |
+| `speculation` | Speculative execution (inline, Tier 5) |
+| `structured-output` | Structured output mode (inline, Tier 5) |
+| `streaming-tool-exec-v2` | Streaming tool execution v2 (inline, Tier 5) |
+| `thinkback` | Year-in-review animation skill (inline, Tier 5) |
+| `system-prompt-global-cache` | Global prompt cache. Env: `CLAUDE_CODE_FORCE_GLOBAL_CACHE` |
 
-Plus 15 reverse-engineered gates: `marble-anvil` (clear thinking beta), `marble-kite` (write/edit guardrail bypass), `coral-fern` (past session access), `quiet-fern` (VS Code experiment), `plank-river-frost` (prompt suggestions), `scarf-coffee` (conditional tool injection), `cork-m4q` (policy spec injection), `tst-kx7` (tool search experiment), `plum-vx3` (WebSearch behavior), `tool-pear` (tool schema filtering), `flicker` (TUI telemetry), `quartz-lantern` (subscription), `cache-plum-violet` (cache variant), `kv7-prompt-sort` (prompt reordering), `workout` (v1, superseded).
-
-## Flag Taxonomy
-
-Of the **605 unique `tengu_*` flags** in the v2.1.37 binary, most are telemetry event names (passed to `logEvent()`), not feature gates. The ~30 codename-style gates above are the ones that control feature availability via `checkGate()`. Additionally, 114 `CLAUDE_CODE_*` env vars, 23 `DISABLE_*` toggles, and 12 `ENABLE_*` toggles provide runtime feature control.
-
-See [docs/TENGU-FLAGS.md](docs/TENGU-FLAGS.md) for the complete flag catalog organized by category.
-See [docs/ENV-VARS.md](docs/ENV-VARS.md) for the complete environment variable reference.
-
-## Environment Variable Overrides
-
-Some features can be toggled via environment variables without binary patching:
-
-| Variable | Effect |
-|----------|--------|
-| `CLAUDE_CODE_AGENT_SWARMS` | Controls swarm/multi-agent features |
-| `CLAUDE_CODE_TEAM_MODE` | Experimental team mode |
-| `CLAUDE_CODE_DISABLE_AUTO_MEMORY` | Disable auto memory (oboe gate) |
-| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | Agent teams (amber-flint gate) |
-| `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION` | Prompt suggestions (detection-only) |
-| `CLAUDE_CODE_SIMPLE` | Simplified system prompt (detection-only) |
-| `CLAUDE_CODE_FORCE_GLOBAL_CACHE` | Global system prompt cache (detection-only) |
+Plus **15 reverse-engineered gates**: `marble-anvil` (clear thinking beta), `marble-kite` (write/edit guardrail bypass), `coral-fern` (past session access), `quiet-fern` (VS Code experiment), `plank-river-frost` (prompt suggestions), `scarf-coffee` (conditional tool injection), `cork-m4q` (policy spec injection), `tst-kx7` (tool search experiment), `plum-vx3` (WebSearch behavior), `tool-pear` (tool schema filtering), `flicker` (TUI telemetry), `quartz-lantern` (subscription), `cache-plum-violet` (cache variant), `kv7-prompt-sort` (prompt reordering), `workout` (v1, superseded). See [FEATURE-GATES.md](docs/FEATURE-GATES.md) for full details.
 
 ## Programmatic API
 
@@ -158,46 +146,49 @@ Binary patches use byte-length-preserving replacements padded with JS block comm
 
 ```
 src/
-  cli.ts              # CLI interface
-  cli-finder.ts       # Locates Claude Code installations
-  types.ts            # Type definitions
-  index.ts            # Public API exports
+  cli.ts              — CLI entry point
+  cli-finder.ts       — Locates Claude Code installations
+  types.ts            — Type definitions
+  index.ts            — Public API exports
   gates/
-    registry.ts       # Gate registry (9 patchable, 20 detection-only)
-    detector.ts       # Gate detection in JS/binary bundles
-    patcher.ts        # Gate enable/disable for JS bundles
-    binary-patcher.ts # Gate patching for native binaries
-    index.ts          # Gate API exports
+    registry.ts       — Gate registry (9 patchable, 20 detection-only)
+    detector.ts       — Gate detection in JS/binary bundles
+    patcher.ts        — JS bundle patching
+    binary-patcher.ts — Binary patching with codesign
+    index.ts          — Gate module exports
 docs/
-  FEATURE-GATES.md    # Patchable gates reference
-  TENGU-FLAGS.md      # Complete 572-flag catalog
+  FEATURE-GATES.md    — Patchable gates deep-dive
+  TENGU-FLAGS.md      — Complete 605-flag catalog
+  ENV-VARS.md         — Environment variable reference
 ```
 
-Zero runtime dependencies. Node.js >= 18.0.0.
+## v2.1.37 Compatibility
+
+Tested against Claude Code v2.1.37. Gate regexes may need updating when minification changes between versions. See [FEATURE-GATES.md](docs/FEATURE-GATES.md) for detailed compatibility notes.
+
+## Documentation
+
+- **[FEATURE-GATES.md](docs/FEATURE-GATES.md)** — Deep-dive on all patchable and detection-only gates, tier explanations, and version compatibility
+- **[TENGU-FLAGS.md](docs/TENGU-FLAGS.md)** — Complete catalog of all 605 `tengu_*` flags organized by category
+- **[ENV-VARS.md](docs/ENV-VARS.md)** — Reference for 114 `CLAUDE_CODE_*` environment variables, `DISABLE_*` toggles, and `ENABLE_*` toggles
 
 ## Development
 
 ```bash
-npm run build        # Compile TypeScript
-npm test             # Run tests
-npm run dev          # Watch mode
-npm run lint         # ESLint
+npm run build     # Compile TypeScript
+npm test          # Run tests (vitest)
+npm run dev       # Watch mode
+npm run lint      # ESLint
 ```
 
-## Version Compatibility
+## Contributing
 
-| Claude Code Version | Status |
-|---------------------|--------|
-| 2.1.x | Tested |
-| 2.0.x | Tested |
-| 1.x | May work |
-
-Gate regexes may need updating when Claude Code updates change the minified output.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing requirements, and how to add new gates.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE)
 
 ## Disclaimer
 
-This is an unofficial project and is not affiliated with or endorsed by Anthropic. It modifies the Claude Code CLI through binary patching and may break with updates. Use at your own risk. Feature gate names and behaviors may change between Claude Code versions. Always create backups before patching.
+This is an unofficial project not affiliated with or endorsed by Anthropic. It modifies the Claude Code CLI through binary patching and may break with updates. Use at your own risk. Feature gate names and behaviors may change between versions. Always create backups before patching.

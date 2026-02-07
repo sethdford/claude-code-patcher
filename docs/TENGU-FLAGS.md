@@ -28,7 +28,7 @@ reverse-engineered from the binary.
 | `tengu_silver_lantern` | silver-lantern | 3 | | Promo mode selector (subscription-based) |
 | `tengu_copper_lantern` | copper-lantern | 3 | | Pro/Max subscription promo banner |
 
-### Detection-Only Gates (20)
+### Detection-Only Gates (22)
 
 | Flag | Codename | Tier | Purpose |
 |------|----------|------|---------|

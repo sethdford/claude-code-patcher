@@ -23,10 +23,22 @@
     "claude-code",
     "feature-gates",
     "statsig",
-    "tengu"
+    "tengu",
+    "binary-patching",
+    "feature-flags",
+    "reverse-engineering",
+    "cli-tool"
   ],
   "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anthropics/claude-code-patcher.git"
+  },
+  "homepage": "https://github.com/anthropics/claude-code-patcher#readme",
+  "bugs": {
+    "url": "https://github.com/anthropics/claude-code-patcher/issues"
+  },
   "devDependencies": {
     "@types/node": "^20.10.0",
     "@typescript-eslint/eslint-plugin": "^6.13.0",
@@ -40,6 +52,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
   ]
 }

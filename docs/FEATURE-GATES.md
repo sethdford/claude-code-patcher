@@ -35,7 +35,7 @@ codename-style gates control feature availability.
 | `silver-lantern` | `tengu_silver_lantern` | | Promo mode selector — returns "promo" or "launch-only" based on subscription state |
 | `copper-lantern` | `tengu_copper_lantern` | | Pro/Max subscription promo banner — checks subscription tier, config dates, and extra usage |
 
-## Detection-Only Gates (20)
+## Detection-Only Gates (22)
 
 ### With Env Override (3)
 
@@ -45,7 +45,7 @@ codename-style gates control feature availability.
 | `vinteuil-phrase` | `tengu_vinteuil_phrase` | `CLAUDE_CODE_SIMPLE` | Simplified system prompt — lighter prompt for reduced latency/cost |
 | `system-prompt-global-cache` | `tengu_system_prompt_global_cache` | `CLAUDE_CODE_FORCE_GLOBAL_CACHE` | Global prompt cache — share prompt cache across sessions |
 
-### Inline Checks — Tier 5 (3)
+### Inline Checks — Tier 5 (4)
 
 | Codename | Flag | What It Controls |
 |----------|------|-----------------|
@@ -233,7 +233,7 @@ Tested against Claude Code v2.1.37 (native ARM64 binary, 181MB).
 | `silver-lantern` | Detected | Pattern changed: now includes `pB()?"promo-copper":"promo"` ternary |
 | `copper-lantern` | Detected | Complex function (349 bytes), nested regex handles it |
 
-All detection-only gates (20/20) detected via simple string matching.
+All detection-only gates (22/22) detected via simple string matching.
 
 ## Environment Variable Overrides
 
