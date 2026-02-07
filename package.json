@@ -1,7 +1,7 @@
 {
   "name": "claude-code-patcher",
-  "version": "1.0.0",
-  "description": "Extend Claude Code with custom native tools - no MCP required",
+  "version": "2.0.0",
+  "description": "Feature gate detection, analysis, and patching for Claude Code",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -10,9 +10,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "patch": "node dist/cli.js patch",
-    "unpatch": "node dist/cli.js unpatch",
-    "list": "node dist/cli.js list",
+    "gates": "node dist/cli.js gates",
+    "gates:scan": "node dist/cli.js gates scan",
     "lint": "eslint src --ext .ts",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -22,10 +21,9 @@
   "keywords": [
     "claude",
     "claude-code",
-    "ai",
-    "tools",
-    "patcher",
-    "extension"
+    "feature-gates",
+    "statsig",
+    "tengu"
   ],
   "author": "",
   "license": "MIT",

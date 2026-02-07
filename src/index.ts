@@ -1,89 +1,57 @@
 /**
- * Claude Code Patcher
- * 
- * Extend Claude Code with custom native tools - no MCP required.
- * 
- * @example
- * ```typescript
- * import { patch, taskTools } from 'claude-code-patcher';
- * 
- * // Patch with built-in task tools
- * const result = patch({ tools: taskTools });
- * 
- * // Or create custom tools
- * import { patch, CustomToolDefinition } from 'claude-code-patcher';
- * 
- * const myTool: CustomToolDefinition = {
- *   name: 'MyTool',
- *   description: 'Does something useful',
- *   inputSchema: {
- *     type: 'object',
- *     properties: {
- *       input: { type: 'string', description: 'The input' }
- *     },
- *     required: ['input']
- *   },
- *   async execute(input) {
- *     return { result: `Processed: ${input.input}` };
- *   }
- * };
- * 
- * patch({ tools: [myTool] });
- * ```
+ * Claude Code Patcher — Feature Gate Toolkit
+ *
+ * Detect, analyze, and patch Statsig feature gates in Claude Code.
  */
 
-// Core patcher
-export { patch, unpatch, getPatchStatus } from './patcher.js';
+// Gate registry
+export {
+  getAllGates,
+  getPatchableGates,
+  findGate,
+  findPatchableGate,
+  getGatesByCategory,
+  isPatchable,
+  GATE_PATCH_MARKER,
+  BINARY_PATCH_MARKER,
+} from './gates/index.js';
+
+// Gate detection
+export {
+  detectAllGates,
+  detectGate,
+  detectPatchableGates,
+  scanAllFlags,
+  findJsBundle,
+  resolveBundle,
+} from './gates/index.js';
+
+// Gate patching
+export {
+  enableGate,
+  disableGate,
+  enableAllGates,
+  resetGates,
+} from './gates/index.js';
+
+// Binary patching
+export {
+  enableBinaryGate,
+  enableAllBinaryGates,
+  createPaddedReplacement,
+  patchBinaryGate,
+  isBinaryPatched,
+} from './gates/index.js';
 
 // CLI finder
 export { findCli, findAllClis, validateCliPath } from './cli-finder.js';
 
-// Tool builder
-export { generateToolCode, generateInjectionCode } from './tool-builder.js';
-
-// Built-in tools
-export { 
-  // Task tools
-  taskTools,
-  TaskCreate,
-  TaskGet,
-  TaskUpdate,
-  TaskList,
-  
-  // Gastown tools
-  gastownTools,
-  BeadCreate,
-  BeadGet,
-  BeadUpdate,
-  BeadList,
-  ConvoyCreate,
-  ConvoyAdd,
-  ConvoyShow,
-  ConvoyList,
-  AgentSling,
-  AgentList,
-  HookWrite,
-  HookRead,
-  MailSend,
-  MailCheck,
-  MailReply,
-  WhoAmI,
-  
-  // All tools
-  builtInTools
-} from './tools/index.js';
-
 // Types
 export type {
-  ClaudeTool,
-  CustomToolDefinition,
-  JsonSchema,
-  JsonSchemaProperty,
-  PatchResult,
-  PatcherConfig,
+  FeatureGate,
+  BundleInfo,
+  GateStatus,
+  GateResult,
+  GatePatchConfig,
   CliLocation,
-  ToolContext,
-  ToolRenderMessage,
-  PermissionResult,
-  ValidationResult
 } from './types.js';
