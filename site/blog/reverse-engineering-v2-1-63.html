@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reverse Engineering Claude Code v2.1.63 — Claude Insider</title>
+    <meta
+      name="description"
+      content="A deep dive into the latest Claude Code binary — 6 new patchable gates, 55 new flags, and what they reveal about upcoming features."
+    />
+    <link rel="stylesheet" href="../assets/css/styles.css" />
+  </head>
+  <body>
+    <!-- Header -->
+    <header class="site-header">
+      <nav class="nav container">
+        <a href="../index.html" class="nav-brand">
+          <svg viewBox="0 0 28 28" fill="none">
+            <path
+              d="M14 2L3 8v12l11 6 11-6V8L14 2z"
+              stroke="currentColor"
+              stroke-width="1.5"
+              fill="none"
+            />
+            <path
+              d="M14 8l-6 3.5v7L14 22l6-3.5v-7L14 8z"
+              fill="currentColor"
+              opacity="0.15"
+            />
+            <circle cx="14" cy="14" r="3" fill="currentColor" />
+          </svg>
+          Claude Insider
+        </a>
+        <button class="nav-toggle" aria-label="Menu" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path
+              d="M4 6h16M4 12h16M4 18h16"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+        <ul class="nav-links">
+          <li>
+            <a href="../gates.html"
+              ><svg viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M8 1L2 4v4.5c0 3.5 2.5 6.5 6 7.5 3.5-1 6-4 6-7.5V4L8 1z"
+                  stroke="currentColor"
+                  stroke-width="1.3"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M6 8l1.5 1.5L10 6.5"
+                  stroke="currentColor"
+                  stroke-width="1.3"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              Gates</a
+            >
+          </li>
+          <li>
+            <a href="../env-vars.html"
+              ><svg viewBox="0 0 16 16" fill="none">
+                <rect
+                  x="2"
+                  y="3"
+                  width="12"
+                  height="10"
+                  rx="2"
+                  stroke="currentColor"
+                  stroke-width="1.3"
+                />
+                <path
+                  d="M5 7h6M5 9.5h4"
+                  stroke="currentColor"
+                  stroke-width="1.3"
+                  stroke-linecap="round"
+                />
+              </svg>
+              Env Vars</a
+            >
+          </li>
+          <li>
+            <a href="../changelog.html"
+              ><svg viewBox="0 0 16 16" fill="none">
+                <circle
+                  cx="8"
+                  cy="8"
+                  r="6"
+                  stroke="currentColor"
+                  stroke-width="1.3"
+                />
+                <path
+                  d="M8 5v3.5l2.5 1.5"
+                  stroke="currentColor"
+                  stroke-width="1.3"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              Changelog</a
+            >
+          </li>
+          <li>
+            <a href="index.html" class="active"
+              ><svg viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M2 3h12v10H2z"
+                  stroke="currentColor"
+                  stroke-width="1.3"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M5 6h6M5 8.5h4"
+                  stroke="currentColor"
+                  stroke-width="1.3"
+                  stroke-linecap="round"
+                />
+              </svg>
+              Blog</a
+            >
+          </li>
+          <li>
+            <a
+              href="https://github.com/anthropics/claude-code-patcher"
+              class="nav-github"
+              target="_blank"
+              rel="noopener"
+              ><svg viewBox="0 0 24 24" fill="currentColor">
+                <path
+                  d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.866-.013-1.7-2.782.603-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836a9.59 9.59 0 012.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"
+                /></svg
+            ></a>
+          </li>
+        </ul>
+      </nav>
+    </header>
+
+    <main>
+      <article class="blog-post">
+        <div class="blog-post-header">
+          <p class="blog-post-date">February 28, 2026</p>
+          <h1>Reverse Engineering Claude Code v2.1.63</h1>
+          <p class="blog-post-lead">
+            A deep dive into the latest Claude Code binary reveals 6 new
+            patchable gates, 55 new tengu flags, and hints at upcoming features
+            including voice dictation and remote control.
+          </p>
+        </div>
+
+        <h2>Methodology</h2>
+        <p>
+          Every Claude Code release ships as a compiled JavaScript binary. By
+          analyzing string literals, function signatures, and conditional paths
+          in the binary, we can extract feature gates, environment variable
+          checks, and telemetry flags that reveal both current hidden features
+          and upcoming capabilities.
+        </p>
+        <p>For v2.1.63, we focused on three extraction techniques:</p>
+        <ul>
+          <li>
+            <strong>String pattern matching</strong> for
+            <code>tengu_</code> prefixed identifiers (the internal namespace for
+            feature flags)
+          </li>
+          <li>
+            <strong>Conditional branch analysis</strong> to determine gate
+            behavior (boolean check vs. data return vs. inline check)
+          </li>
+          <li>
+            <strong>Environment variable scanning</strong> for
+            <code>CLAUDE_CODE_</code>, <code>ENABLE_</code>, and
+            <code>DISABLE_</code> prefixed variables
+          </li>
+        </ul>
+
+        <h2>Key Discoveries</h2>
+
+        <h3>6 New Patchable Gates</h3>
+        <p>
+          The most exciting finding: six new gates that can be enabled with
+          claude-code-patcher. Four are Tier 1 (simple boolean wrappers) and two
+          are Tier 1 additions that were previously undocumented.
+        </p>
+
+        <p>
+          <strong>amber-quartz</strong> (<code>tengu_amber_quartz</code>)
+          enables voice dictation mode. Hold Space to record audio, which is
+          transcribed and sent as input. This suggests Anthropic is building
+          native speech-to-text into the CLI.
+        </p>
+        <pre><code>claude-patcher gates enable amber-quartz</code></pre>
+
+        <p>
+          <strong>ccr-bridge</strong> (<code>tengu_ccr_bridge</code>) opens a
+          WebSocket-based remote control bridge. This allows controlling a
+          Claude Code instance from another machine, enabling scenarios like
+          running Claude Code on a powerful server while interacting from a
+          lightweight client.
+        </p>
+        <pre><code>claude-patcher gates enable ccr-bridge</code></pre>
+
+        <p>
+          <strong>mcp-elicitation</strong> (<code>tengu_mcp_elicitation</code>)
+          allows MCP servers to ask users clarifying questions during tool
+          execution. Currently, MCP tools either succeed or fail silently. With
+          elicitation, a tool can pause and ask for additional input.
+        </p>
+        <pre><code>claude-patcher gates enable mcp-elicitation</code></pre>
+
+        <p>
+          <strong>immediate-model-command</strong>
+          (<code>tengu_immediate_model_command</code>) enables instant model
+          switching via the <code>/model</code> command without requiring a
+          reconnection to the API. This makes model switching seamless
+          mid-conversation.
+        </p>
+        <pre><code>claude-patcher gates enable immediate-model-command</code></pre>
+
+        <p>
+          <strong>pr-status-cli</strong> (<code>tengu_pr_status_cli</code>) adds
+          pull request status display directly in the terminal interface, and
+          <strong>keybinding-customization</strong>
+          (<code>tengu_keybinding_customization_release</code>) enables custom
+          keyboard shortcut configuration.
+        </p>
+
+        <h3>New Detection-Only Gates</h3>
+        <p>Two new Tier 5 gates were added for internal tracking:</p>
+        <ul>
+          <li>
+            <strong>coral-whistle</strong> (<code>tengu_coral_whistle</code>) —
+            Tool usage frequency tracking for analytics
+          </li>
+          <li>
+            <strong>pebble-leaf-prune</strong>
+            (<code>tengu_pebble_leaf_prune</code>) — Session history leaf node
+            pruning for memory optimization
+          </li>
+        </ul>
+
+        <h2>Flag Categorization</h2>
+        <p>
+          The total tengu flag count grew from 605 to 660, a net increase of 55
+          flags. Two entirely new categories emerged:
+        </p>
+        <ul>
+          <li>
+            <strong>Memory Directory</strong> (5 flags) — Related to the new
+            auto-memory file management system
+          </li>
+          <li>
+            <strong>Subscription &amp; Penguin Mode</strong> (8 flags) —
+            Subscription tier enforcement and rate limiting (internally called
+            "penguin mode" when limits are hit)
+          </li>
+        </ul>
+        <p>
+          The largest category remains API &amp; Networking (17 flags), followed
+          by OAuth &amp; Authentication (39 flags) and MCP-related flags (26
+          flags).
+        </p>
+
+        <h2>Gate Tier System</h2>
+        <p>
+          Understanding the tier system is crucial for knowing what can be
+          patched:
+        </p>
+        <ul>
+          <li>
+            <strong>Tier 1</strong> — Simple boolean wrappers. The gate check
+            returns true/false directly. Easy to patch by overriding the return
+            value. (6 gates, all patchable)
+          </li>
+          <li>
+            <strong>Tier 2</strong> — Environment-guarded gates. These check an
+            env var first, then fall back to a remote gate check. Patchable by
+            setting the env var or overriding the gate. (3 gates, all patchable)
+          </li>
+          <li>
+            <strong>Tier 4</strong> — Data gates. These return objects or
+            strings, not booleans. Patching requires understanding the expected
+            return format. (3 gates, detection only)
+          </li>
+          <li>
+            <strong>Tier 5</strong> — Inline checks. The gate value is checked
+            inline within larger functions. Patching requires modifying control
+            flow, which risks breaking other functionality. (28 gates, detection
+            only)
+          </li>
+        </ul>
+
+        <h2>Notable Findings</h2>
+
+        <blockquote>
+          The most architecturally interesting discovery is the separation
+          between "feature gates" (which control whether code paths execute) and
+          "tengu flags" (which are string identifiers used for telemetry, A/B
+          testing, and configuration). The 40 gates we track are the tip of the
+          iceberg — the 660 flags represent the full surface area of
+          instrumentation.
+        </blockquote>
+
+        <p>Other notable observations from v2.1.63:</p>
+        <ul>
+          <li>
+            The <code>penguins-off</code> gate now returns a structured disable
+            message, suggesting Anthropic can remotely kill fast mode with a
+            user-facing explanation
+          </li>
+          <li>
+            Tool search (<code>tst-kx7</code>) is being actively developed —
+            deferred tool loading reduces initial context size
+          </li>
+          <li>
+            Memory-related gates (<code>moth-copse</code>,
+            <code>mulberry-fog</code>) indicate auto-memory is getting more
+            sophisticated injection logic
+          </li>
+          <li>
+            Multiple style/output gates (<code>bergotte-lantern</code>,
+            <code>swann-brevity</code>) suggest Anthropic is A/B testing
+            different response styles
+          </li>
+        </ul>
+
+        <h2>What's Next</h2>
+        <p>
+          We'll continue tracking gate changes across releases. The voice
+          dictation gate (amber-quartz) and remote control bridge (ccr-bridge)
+          are particularly exciting — they suggest Claude Code is expanding well
+          beyond a text-only terminal tool.
+        </p>
+        <p>
+          Explore all gates in the <a href="../gates.html">Gate Explorer</a>, or
+          check the full <a href="../changelog.html">changelog</a> for version
+          history.
+        </p>
+      </article>
+    </main>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+      <div class="container">
+        <div class="footer-content">
+          <p class="footer-disclaimer">
+            Claude Insider is an unofficial, community-driven project. Not
+            affiliated with Anthropic.
+          </p>
+          <ul class="footer-links">
+            <li>
+              <a
+                href="https://github.com/anthropics/claude-code-patcher"
+                target="_blank"
+                rel="noopener"
+                ><svg
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  style="width: 16px; height: 16px"
+                >
+                  <path
+                    d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.866-.013-1.7-2.782.603-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836a9.59 9.59 0 012.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"
+                  />
+                </svg>
+                GitHub</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://www.npmjs.com/package/claude-code-patcher"
+                target="_blank"
+                rel="noopener"
+                ><svg
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  style="width: 16px; height: 16px"
+                >
+                  <rect
+                    x="1"
+                    y="4"
+                    width="14"
+                    height="8"
+                    rx="1"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                  />
+                  <path
+                    d="M5 7v3M8 7v3M8 7h2v2H8"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                npm</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://github.com/anthropics/claude-code-patcher/tree/main/docs"
+                target="_blank"
+                rel="noopener"
+                ><svg
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  style="width: 16px; height: 16px"
+                >
+                  <path
+                    d="M2 2.5h4.5c1.1 0 2 .9 2 2v9a1.5 1.5 0 00-1.5-1.5H2V2.5zM14 2.5H9.5c-1.1 0-2 .9-2 2v9a1.5 1.5 0 011.5-1.5H14V2.5z"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                Docs</a
+              >
+            </li>
+          </ul>
+        </div>
+      </div>
+    </footer>
+
+    <script src="../assets/js/data.js"></script>
+    <script src="../assets/js/app.js"></script>
+  </body>
+</html>
