@@ -8,13 +8,14 @@
 export {
   getAllGates,
   getPatchableGates,
+  getLegacyGates,
   findGate,
   findPatchableGate,
   getGatesByCategory,
   isPatchable,
   GATE_PATCH_MARKER,
   BINARY_PATCH_MARKER,
-} from './gates/index.js';
+} from "./gates/index.js";
 
 // Gate detection
 export {
@@ -24,7 +25,7 @@ export {
   scanAllFlags,
   findJsBundle,
   resolveBundle,
-} from './gates/index.js';
+} from "./gates/index.js";
 
 // Gate patching
 export {
@@ -32,7 +33,7 @@ export {
   disableGate,
   enableAllGates,
   resetGates,
-} from './gates/index.js';
+} from "./gates/index.js";
 
 // Binary patching
 export {
@@ -41,10 +42,10 @@ export {
   createPaddedReplacement,
   patchBinaryGate,
   isBinaryPatched,
-} from './gates/index.js';
+} from "./gates/index.js";
 
 // CLI finder
-export { findCli, findAllClis, validateCliPath } from './cli-finder.js';
+export { findCli, findAllClis, validateCliPath } from "./cli-finder.js";
 
 // Types
 export type {
@@ -54,4 +55,4 @@ export type {
   GateResult,
   GatePatchConfig,
   CliLocation,
-} from './types.js';
+} from "./types.js";
